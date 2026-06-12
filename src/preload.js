@@ -5,12 +5,16 @@ contextBridge.exposeInMainWorld('svnBrowser', {
     list: () => ipcRenderer.invoke('repositories:list'),
     accounts: () => ipcRenderer.invoke('repositories:accounts'),
     save: (repository) => ipcRenderer.invoke('repositories:save', repository),
-    delete: (id) => ipcRenderer.invoke('repositories:delete', id)
+    delete: (id) => ipcRenderer.invoke('repositories:delete', id),
+    chooseLocalDirectory: () => ipcRenderer.invoke('repositories:choose-local-directory'),
+    clearLocal: (id) => ipcRenderer.invoke('repositories:clear-local', id)
   },
   svn: {
     list: (repositoryId, relativePath) => ipcRenderer.invoke('svn:list', repositoryId, relativePath),
     search: (repositoryId, keyword) => ipcRenderer.invoke('svn:search', repositoryId, keyword),
     export: (repositoryId, relativePath) => ipcRenderer.invoke('svn:export', repositoryId, relativePath),
+    applyToLocal: (repositoryId, relativePath) =>
+      ipcRenderer.invoke('svn:apply-to-local', repositoryId, relativePath),
     copyToClipboard: (repositoryId, relativePaths) =>
       ipcRenderer.invoke('svn:copy-to-clipboard', repositoryId, relativePaths)
   },

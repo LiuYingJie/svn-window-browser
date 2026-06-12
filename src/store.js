@@ -93,6 +93,7 @@ class JsonStore {
       id: existing?.id || crypto.randomUUID(),
       name: input.name.trim(),
       url: input.url.trim().replace(/\/+$/, ''),
+      localDirectory: input.localDirectory?.trim() || '',
       username,
       passwordEncrypted: password ? this.encryptPassword(password) : '',
       createdAt: existing?.createdAt || new Date().toISOString()

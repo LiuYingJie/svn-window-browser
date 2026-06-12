@@ -16,11 +16,13 @@ test('JsonStore persists encrypted passwords and returns safe repository lists',
   const saved = store.saveRepository({
     name: 'Assets',
     url: 'https://example.test/svn/',
+    localDirectory: 'D:\\projects\\assets',
     username: 'alice',
     password: 'secret'
   });
 
   assert.equal(store.getRepository(saved.id).password, 'secret');
+  assert.equal(store.getRepository(saved.id).localDirectory, 'D:\\projects\\assets');
   assert.equal(store.getRepositories()[0].passwordEncrypted, undefined);
   assert.equal(fs.readFileSync(filePath, 'utf8').includes('secret'), false);
   fs.rmSync(directory, { recursive: true, force: true });

@@ -6,6 +6,11 @@ const { SvnService } = require('./svn-service');
 const { detectSvnClient } = require('./client-detector');
 const { copyFilesToClipboard } = require('./windows-clipboard');
 const { CacheManager } = require('./cache-manager');
+const {
+  clearLocalDirectory,
+  resolveLocalResource,
+  validateLocalDirectory
+} = require('./local-resources');
 
 let mainWindow;
 let store;
@@ -41,8 +46,37 @@ function createWindow() {
 function registerHandlers() {
   ipcMain.handle('repositories:list', () => store.getRepositories());
   ipcMain.handle('repositories:accounts', () => store.getSavedAccounts());
-  ipcMain.handle('repositories:save', (_event, repository) => store.saveRepository(repository));
+  ipcMain.handle('repositories:save', (_event, repository) => {
+    if (repository.localDirectory?.trim()) {
+      repository.localDirectory = validateLocalDirectory(repository.localDirectory);
+    }
+    return store.saveRepository(repository);
+  });
   ipcMain.handle('repositories:delete', (_event, id) => store.deleteRepository(id));
+  ipcMain.handle('repositories:choose-local-directory', async () => {
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: '选择仓库本地目录',
+      properties: ['openDirectory', 'createDirectory']
+    });
+    return result.canceled ? null : result.filePaths[0] || null;
+  });
+  ipcMain.handle('repositories:clear-local', async (_event, repositoryId) => {
+    const repository = store.getRepository(repositoryId);
+    if (!repository) throw new Error('仓库不存在或已被删除');
+    const localDirectory = validateLocalDirectory(repository.localDirectory);
+    const result = await dialog.showMessageBox(mainWindow, {
+      type: 'warning',
+      title: '删除本地资源',
+      message: `确定清空“${repository.name}”的全部本地资源吗？`,
+      detail: `将永久删除以下目录中的所有文件和文件夹，但保留目录本身：\n${localDirectory}`,
+      buttons: ['取消', '删除本地资源'],
+      defaultId: 0,
+      cancelId: 0,
+      noLink: true
+    });
+    if (result.response !== 1) return null;
+    return clearLocalDirectory(localDirectory);
+  });
 
   ipcMain.handle('svn:list', async (_event, repositoryId, relativePath) => {
     const repository = store.getRepository(repositoryId);
@@ -65,6 +99,12 @@ function registerHandlers() {
     });
     if (result.canceled || !result.filePaths[0]) return null;
     return svn.export(repository, relativePath, result.filePaths[0]);
+  });
+  ipcMain.handle('svn:apply-to-local', async (_event, repositoryId, relativePath) => {
+    const repository = store.getRepository(repositoryId);
+    if (!repository) throw new Error('仓库不存在或已被删除');
+    const { destination } = resolveLocalResource(repository.localDirectory, relativePath);
+    return svn.exportToLocal(repository, relativePath, destination);
   });
 
   ipcMain.handle('svn:copy-to-clipboard', async (_event, repositoryId, relativePaths) => {

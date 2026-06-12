@@ -1,5 +1,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
 const { SvnService, parseSvnList } = require('../src/svn-service');
 
 test('parseSvnList parses and sorts directories before files', () => {
@@ -65,4 +68,23 @@ test('SvnService search returns recursive name matches with full paths', async (
       date: ''
     }
   ]);
+});
+
+test('SvnService exports a resource directly to its local relative path', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'svn-browser-export-local-'));
+  const destination = path.join(root, 'assets', 'logo.png');
+  const service = new SvnService(() => 'svn');
+  let invocation;
+  service.run = async (args, repository) => {
+    invocation = { args, repository };
+  };
+  const repository = { url: 'https://example.test/svn', username: 'alice' };
+
+  assert.equal(await service.exportToLocal(repository, 'assets/logo.png', destination), destination);
+  assert.deepEqual(invocation, {
+    args: ['export', '--force', 'https://example.test/svn/assets/logo.png', destination],
+    repository
+  });
+  assert.equal(fs.existsSync(path.dirname(destination)), true);
+  fs.rmSync(root, { recursive: true, force: true });
 });

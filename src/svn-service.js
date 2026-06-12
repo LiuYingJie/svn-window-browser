@@ -126,6 +126,12 @@ class SvnService {
     return destination;
   }
 
+  async exportToLocal(repository, relativePath, destination) {
+    fs.mkdirSync(path.dirname(destination), { recursive: true });
+    await this.run(['export', '--force', this.buildUrl(repository, relativePath), destination], repository);
+    return destination;
+  }
+
   async exportMany(repository, relativePaths, destinationDirectory) {
     fs.mkdirSync(destinationDirectory, { recursive: true });
     const destinations = [];

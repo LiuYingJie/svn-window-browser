@@ -21,6 +21,10 @@
           <span>我的仓库</span>
           <button id="add-repository" class="icon-button" title="添加仓库">+</button>
         </div>
+        <div class="repository-search">
+          <span aria-hidden="true">⌕</span>
+          <input id="repository-search-input" type="search" placeholder="搜索仓库" aria-label="搜索仓库">
+        </div>
         <nav id="repository-list" class="repository-list"></nav>
 
         <div class="sidebar-actions">
@@ -117,6 +121,14 @@
           <input id="repository-url" required placeholder="https://svn.example.com/project/trunk">
         </label>
         <label>
+          本地目录
+          <span class="input-with-button">
+            <input id="repository-local-directory" placeholder="例如：D:\projectWord\531-clean\531-clean-ui">
+            <button id="choose-local-directory-button" type="button" class="button secondary">选择...</button>
+          </span>
+          <span class="field-hint">右键仓库资源后，可按仓库内相对路径应用到此目录。</span>
+        </label>
+        <label>
           账户方式
           <select id="credential-mode">
             <option value="saved">使用之前用过的账户</option>
@@ -139,8 +151,14 @@
           </label>
         </div>
         <div class="dialog-actions">
-          <button type="button" class="button secondary" data-close-dialog>取消</button>
-          <button type="submit" class="button primary">保存仓库</button>
+          <div class="dialog-danger-actions">
+            <button id="clear-local-resources-button" type="button" class="button danger hidden">删除本地资源</button>
+            <button id="delete-repository-button" type="button" class="button danger hidden">删除仓库</button>
+          </div>
+          <div class="dialog-primary-actions">
+            <button type="button" class="button secondary" data-close-dialog>取消</button>
+            <button type="submit" class="button primary">保存仓库</button>
+          </div>
         </div>
       </form>
     </dialog>
@@ -193,6 +211,10 @@
         <button id="clear-cache-button" type="button" class="button danger">清空缓存</button>
       </div>
     </dialog>
+
+    <div id="resource-context-menu" class="context-menu hidden" role="menu">
+      <button id="apply-to-local-button" type="button" role="menuitem">应用到本地目录</button>
+    </div>
 
     <div id="toast" class="toast hidden"></div>
     <script src="app.js"></script>

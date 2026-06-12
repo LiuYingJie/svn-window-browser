@@ -1,5 +1,6 @@
 const state = {
   repositories: [],
+  repositoryQuery: '',
   savedAccounts: [],
   activeRepositoryId: null,
   currentPath: '',
@@ -9,7 +10,8 @@ const state = {
   entries: [],
   selectedNames: new Set(),
   selectionAnchor: null,
-  loading: false
+  loading: false,
+  contextEntry: null
 };
 
 let marqueeSelection = null;
@@ -17,6 +19,7 @@ let suppressFileListClick = false;
 
 const elements = {
   repositoryList: document.querySelector('#repository-list'),
+  repositorySearchInput: document.querySelector('#repository-search-input'),
   addRepository: document.querySelector('#add-repository'),
   emptyAdd: document.querySelector('#empty-add-button'),
   emptyState: document.querySelector('#empty-state'),
@@ -40,6 +43,10 @@ const elements = {
   repositoryDialog: document.querySelector('#repository-dialog'),
   repositoryForm: document.querySelector('#repository-form'),
   repositoryDialogTitle: document.querySelector('#repository-dialog-title'),
+  repositoryLocalDirectory: document.querySelector('#repository-local-directory'),
+  chooseLocalDirectory: document.querySelector('#choose-local-directory-button'),
+  clearLocalResources: document.querySelector('#clear-local-resources-button'),
+  deleteRepository: document.querySelector('#delete-repository-button'),
   credentialMode: document.querySelector('#credential-mode'),
   savedAccountField: document.querySelector('#saved-account-field'),
   savedAccount: document.querySelector('#saved-account'),
@@ -57,6 +64,8 @@ const elements = {
   detectSvn: document.querySelector('#detect-svn-button'),
   chooseSvn: document.querySelector('#choose-svn-button'),
   downloadSvn: document.querySelector('#download-svn-button'),
+  contextMenu: document.querySelector('#resource-context-menu'),
+  applyToLocal: document.querySelector('#apply-to-local-button'),
   toast: document.querySelector('#toast')
 };
 
@@ -79,6 +88,28 @@ function errorMessage(error) {
   return error?.message || String(error);
 }
 
+function isEditableTarget(target) {
+  return target instanceof Element
+    && Boolean(target.closest('input, textarea, select, [contenteditable="true"]'));
+}
+
+function hideContextMenu() {
+  state.contextEntry = null;
+  elements.contextMenu.classList.add('hidden');
+}
+
+function showContextMenu(event, entry) {
+  event.preventDefault();
+  state.contextEntry = entry;
+  elements.applyToLocal.textContent = `应用${entry.kind === 'dir' ? '文件夹' : '文件'}到本地目录`;
+  elements.contextMenu.classList.remove('hidden');
+  const rect = elements.contextMenu.getBoundingClientRect();
+  const left = Math.min(event.clientX, window.innerWidth - rect.width - 8);
+  const top = Math.min(event.clientY, window.innerHeight - rect.height - 8);
+  elements.contextMenu.style.left = `${Math.max(8, left)}px`;
+  elements.contextMenu.style.top = `${Math.max(8, top)}px`;
+}
+
 function applyViewMode(viewMode) {
   state.viewMode = viewMode === 'icons' ? 'icons' : 'list';
   elements.browserView.classList.toggle('icons', state.viewMode === 'icons');
@@ -97,7 +128,24 @@ async function setViewMode(viewMode) {
 
 function renderRepositories() {
   elements.repositoryList.replaceChildren();
-  for (const repository of state.repositories) {
+  const query = state.repositoryQuery.trim().toLocaleLowerCase('zh-CN');
+  const repositories = query
+    ? state.repositories.filter((repository) => [
+      repository.name,
+      repository.url,
+      repository.localDirectory
+    ].some((value) => value?.toLocaleLowerCase('zh-CN').includes(query)))
+    : state.repositories;
+
+  if (repositories.length === 0 && state.repositories.length > 0) {
+    const message = document.createElement('div');
+    message.className = 'repository-empty';
+    message.textContent = `没有找到包含“${state.repositoryQuery.trim()}”的仓库`;
+    elements.repositoryList.append(message);
+    return;
+  }
+
+  for (const repository of repositories) {
     const item = document.createElement('div');
     item.className = `repository-item ${repository.id === state.activeRepositoryId ? 'active' : ''}`;
     item.tabIndex = 0;
@@ -357,6 +405,15 @@ function renderEntries(entries) {
     row.tabIndex = 0;
     row.dataset.path = entry.path;
     row.addEventListener('click', (event) => selectEntry(index, event));
+    row.addEventListener('contextmenu', (event) => {
+      if (!state.selectedNames.has(entry.path)) {
+        state.selectedNames.clear();
+        state.selectedNames.add(entry.path);
+        state.selectionAnchor = index;
+        renderEntries(state.entries);
+      }
+      showContextMenu(event, entry);
+    });
     row.addEventListener('dblclick', () => {
       if (entry.kind === 'dir') loadDirectory(entry.path);
     });
@@ -483,6 +540,7 @@ async function openRepositoryDialog(repository = null) {
   document.querySelector('#repository-id').value = repository?.id || '';
   document.querySelector('#repository-name').value = repository?.name || '';
   document.querySelector('#repository-url').value = repository?.url || '';
+  elements.repositoryLocalDirectory.value = repository?.localDirectory || '';
   document.querySelector('#repository-username').value = repository?.username || '';
   document.querySelector('#repository-password').value = '';
   const savedOption = elements.credentialMode.querySelector('option[value="saved"]');
@@ -490,16 +548,10 @@ async function openRepositoryDialog(repository = null) {
   elements.credentialMode.value = repository || state.savedAccounts.length === 0 ? 'manual' : 'saved';
   updateCredentialFields();
 
-  let deleteButton = elements.repositoryForm.querySelector('.danger');
-  if (deleteButton) deleteButton.remove();
-  if (repository) {
-    deleteButton = document.createElement('button');
-    deleteButton.type = 'button';
-    deleteButton.className = 'button danger';
-    deleteButton.textContent = '删除仓库';
-    deleteButton.addEventListener('click', () => deleteRepository(repository));
-    elements.repositoryForm.querySelector('.dialog-actions').prepend(deleteButton);
-  }
+  elements.clearLocalResources.classList.toggle('hidden', !repository);
+  elements.deleteRepository.classList.toggle('hidden', !repository);
+  elements.clearLocalResources.onclick = repository ? () => clearLocalResources(repository) : null;
+  elements.deleteRepository.onclick = repository ? () => deleteRepository(repository) : null;
   elements.repositoryDialog.showModal();
 }
 
@@ -510,6 +562,7 @@ async function saveRepository(event) {
     id: id || undefined,
     name: document.querySelector('#repository-name').value,
     url: document.querySelector('#repository-url').value,
+    localDirectory: elements.repositoryLocalDirectory.value,
     username: document.querySelector('#repository-username').value
   };
   if (elements.credentialMode.value === 'saved') {
@@ -532,6 +585,16 @@ async function saveRepository(event) {
   }
 }
 
+async function clearLocalResources(repository) {
+  try {
+    const result = await window.svnBrowser.repositories.clearLocal(repository.id);
+    if (!result) return;
+    showToast(`已清空本地目录：${result.directory}`);
+  } catch (error) {
+    showToast(errorMessage(error), 'error');
+  }
+}
+
 async function deleteRepository(repository) {
   if (!confirm(`确定删除仓库“${repository.name}”吗？`)) return;
   await window.svnBrowser.repositories.delete(repository.id);
@@ -549,6 +612,21 @@ async function deleteRepository(repository) {
   elements.repositoryDialog.close();
   renderRepositories();
   showToast('仓库已删除');
+}
+
+async function applyEntryToLocal() {
+  const entry = state.contextEntry;
+  hideContextMenu();
+  if (!entry || !state.activeRepositoryId || state.loading) return;
+  setLoading(true, `正在应用“${entry.name}”到本地目录...`);
+  try {
+    const destination = await window.svnBrowser.svn.applyToLocal(state.activeRepositoryId, entry.path);
+    showToast(`已应用到：${destination}`);
+  } catch (error) {
+    showToast(errorMessage(error), 'error');
+  } finally {
+    setLoading(false);
+  }
 }
 
 async function exportPath(relativePath) {
@@ -710,10 +788,18 @@ async function initialize() {
 
 elements.addRepository.addEventListener('click', () => openRepositoryDialog());
 elements.emptyAdd.addEventListener('click', () => openRepositoryDialog());
+elements.repositorySearchInput.addEventListener('input', () => {
+  state.repositoryQuery = elements.repositorySearchInput.value;
+  renderRepositories();
+});
 elements.repositoryForm.addEventListener('submit', saveRepository);
 elements.searchForm.addEventListener('submit', searchRepository);
 elements.clearSearch.addEventListener('click', clearSearch);
 elements.credentialMode.addEventListener('change', updateCredentialFields);
+elements.chooseLocalDirectory.addEventListener('click', async () => {
+  const directory = await window.svnBrowser.repositories.chooseLocalDirectory();
+  if (directory) elements.repositoryLocalDirectory.value = directory;
+});
 elements.iconsView.addEventListener('click', () => setViewMode('icons'));
 elements.listView.addEventListener('click', () => setViewMode('list'));
 elements.refresh.addEventListener('click', () => loadDirectory(state.currentPath));
@@ -736,6 +822,7 @@ elements.detectSvn.addEventListener('click', async () => {
   showToast(client.ready ? '已找到 SVN 命令行客户端' : '仍未找到 SVN 命令行客户端', client.ready ? 'success' : 'error');
 });
 elements.downloadSvn.addEventListener('click', () => window.svnBrowser.settings.openDownload());
+elements.applyToLocal.addEventListener('click', applyEntryToLocal);
 document.querySelectorAll('[data-close-dialog]').forEach((button) => {
   button.addEventListener('click', () => button.closest('dialog').close());
 });
@@ -751,7 +838,14 @@ elements.fileList.addEventListener('click', (event) => {
   }
 });
 elements.fileList.addEventListener('pointerdown', startMarqueeSelection);
+document.addEventListener('pointerdown', (event) => {
+  if (!event.target.closest('#resource-context-menu')) hideContextMenu();
+});
+window.addEventListener('blur', hideContextMenu);
+window.addEventListener('resize', hideContextMenu);
+document.querySelector('.content').addEventListener('scroll', hideContextMenu);
 document.addEventListener('keydown', (event) => {
+  if (isEditableTarget(event.target)) return;
   if (document.querySelector('dialog[open]') || state.loading) return;
   if (event.ctrlKey && event.key.toLowerCase() === 'c' && state.selectedNames.size > 0) {
     event.preventDefault();
