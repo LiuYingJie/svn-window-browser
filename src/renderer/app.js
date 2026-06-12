@@ -444,7 +444,7 @@ function selectEntry(index, event) {
     state.selectedNames.add(entry.path);
     state.selectionAnchor = index;
   }
-  renderEntries(state.entries);
+  syncSelectedRows();
 }
 
 function renderEntries(entries) {
@@ -470,7 +470,7 @@ function renderEntries(entries) {
         state.selectedNames.clear();
         state.selectedNames.add(entry.path);
         state.selectionAnchor = index;
-        renderEntries(state.entries);
+        syncSelectedRows();
       }
       showContextMenu(event, entry);
     });
