@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SVN Browser</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">S</div>
+          <div>
+            <strong>SVN Browser</strong>
+            <span>资源仓库浏览器</span>
+          </div>
+        </div>
+
+        <div class="sidebar-heading">
+          <span>我的仓库</span>
+          <button id="add-repository" class="icon-button" title="添加仓库">+</button>
+        </div>
+        <nav id="repository-list" class="repository-list"></nav>
+
+        <div class="sidebar-actions">
+          <button id="cache-button" class="settings-button">
+            <span>▣</span>
+            缓存
+          </button>
+          <button id="settings-button" class="settings-button">
+            <span>⚙</span>
+            SVN 客户端设置
+          </button>
+        </div>
+      </aside>
+
+      <main class="main">
+        <header class="toolbar">
+          <div class="navigation-area">
+            <button id="back-button" class="back-button" title="返回上一级" disabled aria-label="返回上一级">
+              <span>←</span>
+            </button>
+            <div>
+              <h1 id="page-title">选择一个仓库</h1>
+              <div id="breadcrumbs" class="breadcrumbs"></div>
+            </div>
+          </div>
+          <div class="toolbar-actions">
+            <form id="search-form" class="search-box">
+              <input id="search-input" type="search" placeholder="搜索文件或文件夹" aria-label="搜索文件或文件夹">
+              <button id="clear-search-button" type="button" class="search-clear hidden" title="清除搜索">×</button>
+              <button type="submit" class="search-button" title="搜索">⌕</button>
+            </form>
+            <div class="view-switcher" aria-label="查看方式">
+              <button id="icons-view-button" class="view-button" title="图标视图" aria-label="图标视图">
+                <span class="grid-symbol"><i></i><i></i><i></i><i></i></span>
+              </button>
+              <button id="list-view-button" class="view-button active" title="列表视图" aria-label="列表视图">
+                <span class="list-symbol"><i></i><i></i><i></i></span>
+              </button>
+            </div>
+            <span id="selection-status" class="selection-status hidden"></span>
+            <button id="copy-selected-button" class="button primary" disabled>复制选中项</button>
+            <button id="refresh-button" class="button secondary" disabled>刷新</button>
+            <button id="export-current-button" class="button secondary" disabled>复制当前文件夹到...</button>
+          </div>
+        </header>
+
+        <section class="content">
+          <div id="empty-state" class="empty-state">
+            <div class="empty-icon">SVN</div>
+            <h2>管理和浏览 SVN 资源</h2>
+            <p>添加仓库后，可在线浏览目录，并将需要的文件或整个文件夹复制到本地。</p>
+            <button id="empty-add-button" class="button primary">添加第一个仓库</button>
+          </div>
+
+          <div id="browser-view" class="browser-view hidden">
+            <div class="table-header">
+              <span>名称</span>
+              <span>版本</span>
+              <span>提交者</span>
+              <span>更新时间</span>
+              <span></span>
+            </div>
+            <div id="file-list" class="file-list"></div>
+            <div class="browser-footer">
+              <span id="item-count">0 个项目</span>
+              <span>单击选择，双击打开文件夹，Ctrl/Shift 多选，Ctrl+C 复制</span>
+            </div>
+          </div>
+
+          <div id="loading" class="loading hidden">
+            <div class="spinner"></div>
+            <span id="loading-message">正在读取仓库...</span>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <dialog id="repository-dialog">
+      <form id="repository-form" method="dialog">
+        <div class="dialog-heading">
+          <div>
+            <h2 id="repository-dialog-title">添加仓库</h2>
+            <p>连接信息仅保存在当前电脑。</p>
+          </div>
+          <button type="button" class="dialog-close" data-close-dialog>×</button>
+        </div>
+        <input id="repository-id" type="hidden">
+        <label>
+          仓库名称
+          <input id="repository-name" required placeholder="例如：美术资源库">
+        </label>
+        <label>
+          SVN 地址
+          <input id="repository-url" required placeholder="https://svn.example.com/project/trunk">
+        </label>
+        <label>
+          账户方式
+          <select id="credential-mode">
+            <option value="saved">使用之前用过的账户</option>
+            <option value="manual">输入账户</option>
+          </select>
+        </label>
+        <label id="saved-account-field">
+          选择账户
+          <select id="saved-account"></select>
+          <span class="field-hint">密码由系统安全存储读取，不会显示在页面中。</span>
+        </label>
+        <div id="manual-account-fields" class="form-row hidden">
+          <label>
+            用户名
+            <input id="repository-username" autocomplete="username">
+          </label>
+          <label>
+            密码
+            <input id="repository-password" type="password" autocomplete="current-password" placeholder="不修改请留空">
+          </label>
+        </div>
+        <div class="dialog-actions">
+          <button type="button" class="button secondary" data-close-dialog>取消</button>
+          <button type="submit" class="button primary">保存仓库</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="settings-dialog">
+      <div class="dialog-heading">
+        <div>
+          <h2>SVN 客户端设置</h2>
+          <p>应用需要 SVN 命令行客户端来访问仓库。</p>
+        </div>
+        <button type="button" class="dialog-close" data-close-dialog>×</button>
+      </div>
+      <div class="setting-card">
+        <div id="client-status" class="client-status"></div>
+        <strong>命令行客户端路径</strong>
+        <code id="svn-path">正在自动检测...</code>
+        <div class="setting-actions">
+          <button id="detect-svn-button" class="button secondary">重新检测</button>
+          <button id="choose-svn-button" class="button secondary">手动选择</button>
+          <button id="download-svn-button" class="button primary">获取命令行客户端</button>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog id="cache-dialog">
+      <div class="dialog-heading">
+        <div>
+          <h2>缓存管理</h2>
+          <p>Ctrl+C 时下载的临时文件会保存在这里。</p>
+        </div>
+        <button type="button" class="dialog-close" data-close-dialog>×</button>
+      </div>
+      <div class="cache-summary">
+        <div>
+          <span>缓存大小</span>
+          <strong id="cache-size">正在统计...</strong>
+        </div>
+        <div>
+          <span>文件数量</span>
+          <strong id="cache-file-count">-</strong>
+        </div>
+        <div>
+          <span>缓存批次</span>
+          <strong id="cache-batch-count">-</strong>
+        </div>
+      </div>
+      <p class="cache-note">缓存保留 24 小时，且最多占用 2 GB；超出后会自动从最旧的缓存开始清理。</p>
+      <div class="dialog-actions">
+        <button type="button" class="button secondary" data-close-dialog>关闭</button>
+        <button id="clear-cache-button" type="button" class="button danger">清空缓存</button>
+      </div>
+    </dialog>
+
+    <div id="toast" class="toast hidden"></div>
+    <script src="app.js"></script>
+  </body>
+</html>
