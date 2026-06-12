@@ -70,21 +70,92 @@ test('SvnService search returns recursive name matches with full paths', async (
   ]);
 });
 
-test('SvnService exports a resource directly to its local relative path', async () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'svn-browser-export-local-'));
-  const destination = path.join(root, 'assets', 'logo.png');
+test('SvnService checks out a directory to its full local relative path', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'svn-browser-checkout-local-'));
+  const destination = path.join(root, '关卡', 'BS_51——BS_100', '猪咪');
   const service = new SvnService(() => 'svn');
   let invocation;
   service.run = async (args, repository) => {
     invocation = { args, repository };
   };
+  service.isVersioned = async () => false;
   const repository = { url: 'https://example.test/svn', username: 'alice' };
 
-  assert.equal(await service.exportToLocal(repository, 'assets/logo.png', destination), destination);
+  assert.deepEqual(
+    await service.applyToLocal(repository, '关卡/BS_51——BS_100/猪咪', 'dir', destination),
+    {
+      destination,
+      workingCopyPath: destination,
+      action: 'checked-out'
+    }
+  );
   assert.deepEqual(invocation, {
-    args: ['export', '--force', 'https://example.test/svn/assets/logo.png', destination],
+    args: [
+      'checkout',
+      '--force',
+      'https://example.test/svn/%E5%85%B3%E5%8D%A1/BS_51%E2%80%94%E2%80%94BS_100/%E7%8C%AA%E5%92%AA',
+      destination
+    ],
     repository
   });
   assert.equal(fs.existsSync(path.dirname(destination)), true);
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
+test('SvnService updates an existing directory working copy', async () => {
+  const service = new SvnService(() => 'svn');
+  const destination = 'D:\\project\\关卡\\猪咪';
+  let invocation;
+  const progress = [];
+  service.isVersioned = async () => true;
+  service.run = async (args, repository, options) => {
+    invocation = { args, repository };
+    options.onOutput('Updated to revision 8.\n');
+  };
+  const repository = { url: 'svn://example.test/project' };
+
+  assert.deepEqual(await service.applyToLocal(
+    repository,
+    '关卡/猪咪',
+    'dir',
+    destination,
+    (event) => progress.push(event)
+  ), {
+    destination,
+    workingCopyPath: destination,
+    action: 'updated'
+  });
+  assert.deepEqual(invocation, {
+    args: ['update', destination],
+    repository
+  });
+  assert.deepEqual(progress, [
+    { phase: 'checking', message: '正在检查本地工作副本...' },
+    { phase: 'updating', message: `正在更新：${destination}` },
+    { phase: 'updating', message: 'Updated to revision 8.\n' }
+  ]);
+});
+
+test('SvnService applies a file by checking out its parent directory', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'svn-browser-checkout-file-'));
+  const destination = path.join(root, 'assets', 'icons', 'logo.png');
+  const parent = path.dirname(destination);
+  const service = new SvnService(() => 'svn');
+  let invocation;
+  service.isVersioned = async () => false;
+  service.run = async (args, repository) => {
+    invocation = { args, repository };
+  };
+  const repository = { url: 'https://example.test/svn' };
+
+  assert.deepEqual(await service.applyToLocal(repository, 'assets/icons/logo.png', 'file', destination), {
+    destination,
+    workingCopyPath: parent,
+    action: 'checked-out'
+  });
+  assert.deepEqual(invocation, {
+    args: ['checkout', '--force', 'https://example.test/svn/assets/icons', parent],
+    repository
+  });
   fs.rmSync(root, { recursive: true, force: true });
 });

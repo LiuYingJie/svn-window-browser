@@ -11,7 +11,8 @@ const state = {
   selectedNames: new Set(),
   selectionAnchor: null,
   loading: false,
-  contextEntry: null
+  contextEntry: null,
+  backgroundTasks: new Map()
 };
 
 let marqueeSelection = null;
@@ -66,6 +67,9 @@ const elements = {
   downloadSvn: document.querySelector('#download-svn-button'),
   contextMenu: document.querySelector('#resource-context-menu'),
   applyToLocal: document.querySelector('#apply-to-local-button'),
+  backgroundTasks: document.querySelector('#background-tasks'),
+  backgroundTaskCount: document.querySelector('#background-task-count'),
+  backgroundTaskList: document.querySelector('#background-task-list'),
   toast: document.querySelector('#toast')
 };
 
@@ -86,6 +90,62 @@ function showToast(message, type = 'success') {
 
 function errorMessage(error) {
   return error?.message || String(error);
+}
+
+function progressMessage(message) {
+  return String(message || '')
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .at(-1) || '';
+}
+
+function renderBackgroundTasks() {
+  const tasks = [...state.backgroundTasks.values()]
+    .sort((left, right) => right.startedAt - left.startedAt);
+  elements.backgroundTasks.classList.toggle('hidden', tasks.length === 0);
+  elements.backgroundTaskCount.textContent = tasks.length ? `${tasks.length} 项` : '';
+  elements.backgroundTaskList.replaceChildren();
+
+  for (const task of tasks) {
+    const item = document.createElement('div');
+    item.className = `background-task ${task.status}`;
+
+    const title = document.createElement('div');
+    title.className = 'background-task-title';
+    title.textContent = task.name;
+    title.title = task.path;
+
+    const status = document.createElement('div');
+    status.className = 'background-task-status';
+    status.textContent = task.message;
+    status.title = task.message;
+
+    const progress = document.createElement('div');
+    progress.className = 'background-task-progress';
+    item.append(title, status, progress);
+
+    if (task.status !== 'running') {
+      const close = document.createElement('button');
+      close.type = 'button';
+      close.className = 'background-task-close';
+      close.textContent = '×';
+      close.title = '关闭任务';
+      close.addEventListener('click', () => {
+        state.backgroundTasks.delete(task.id);
+        renderBackgroundTasks();
+      });
+      item.append(close);
+    }
+    elements.backgroundTaskList.append(item);
+  }
+}
+
+function updateBackgroundTask(taskId, changes) {
+  const task = state.backgroundTasks.get(taskId);
+  if (!task) return;
+  Object.assign(task, changes);
+  renderBackgroundTasks();
 }
 
 function isEditableTarget(target) {
@@ -616,16 +676,57 @@ async function deleteRepository(repository) {
 
 async function applyEntryToLocal() {
   const entry = state.contextEntry;
+  const repositoryId = state.activeRepositoryId;
   hideContextMenu();
-  if (!entry || !state.activeRepositoryId || state.loading) return;
-  setLoading(true, `正在应用“${entry.name}”到本地目录...`);
+  if (!entry || !repositoryId) return;
+  const taskScope = entry.kind === 'file'
+    ? entry.path.split('/').slice(0, -1).join('/')
+    : entry.path;
+  const duplicate = [...state.backgroundTasks.values()].some((task) =>
+    task.status === 'running'
+    && task.repositoryId === repositoryId
+    && (
+      task.scope === taskScope
+      || task.scope.startsWith(`${taskScope}/`)
+      || taskScope.startsWith(`${task.scope}/`)
+    )
+  );
+  if (duplicate) {
+    showToast('相同或上级目录已有本地应用任务正在运行');
+    return;
+  }
+
+  const taskId = crypto.randomUUID();
+  state.backgroundTasks.set(taskId, {
+    id: taskId,
+    repositoryId,
+    path: entry.path,
+    scope: taskScope,
+    name: entry.name,
+    status: 'running',
+    message: '正在准备后台任务...',
+    startedAt: Date.now()
+  });
+  renderBackgroundTasks();
+
   try {
-    const destination = await window.svnBrowser.svn.applyToLocal(state.activeRepositoryId, entry.path);
-    showToast(`已应用到：${destination}`);
+    const result = await window.svnBrowser.svn.applyToLocal(
+      repositoryId,
+      entry.path,
+      entry.kind,
+      taskId
+    );
+    updateBackgroundTask(taskId, {
+      status: 'done',
+      message: `${result.action === 'updated' ? '更新完成' : '检出完成'}：${result.destination}`
+    });
+    showToast(`${result.action === 'updated' ? '已更新' : '已检出'}到：${result.destination}`);
   } catch (error) {
+    updateBackgroundTask(taskId, {
+      status: 'failed',
+      message: errorMessage(error)
+    });
     showToast(errorMessage(error), 'error');
-  } finally {
-    setLoading(false);
   }
 }
 
@@ -823,6 +924,10 @@ elements.detectSvn.addEventListener('click', async () => {
 });
 elements.downloadSvn.addEventListener('click', () => window.svnBrowser.settings.openDownload());
 elements.applyToLocal.addEventListener('click', applyEntryToLocal);
+window.svnBrowser.svn.onApplyProgress((progress) => {
+  const message = progressMessage(progress.message);
+  if (message) updateBackgroundTask(progress.taskId, { message });
+});
 document.querySelectorAll('[data-close-dialog]').forEach((button) => {
   button.addEventListener('click', () => button.closest('dialog').close());
 });

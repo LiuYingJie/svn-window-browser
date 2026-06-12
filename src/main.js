@@ -100,11 +100,18 @@ function registerHandlers() {
     if (result.canceled || !result.filePaths[0]) return null;
     return svn.export(repository, relativePath, result.filePaths[0]);
   });
-  ipcMain.handle('svn:apply-to-local', async (_event, repositoryId, relativePath) => {
+  ipcMain.handle('svn:apply-to-local', async (event, repositoryId, relativePath, kind, taskId) => {
     const repository = store.getRepository(repositoryId);
     if (!repository) throw new Error('仓库不存在或已被删除');
+    if (!['file', 'dir'].includes(kind)) throw new Error('不支持的资源类型');
+    if (typeof taskId !== 'string' || !taskId) throw new Error('无效的后台任务');
     const { destination } = resolveLocalResource(repository.localDirectory, relativePath);
-    return svn.exportToLocal(repository, relativePath, destination);
+    const sendProgress = (progress) => {
+      if (!event.sender.isDestroyed()) {
+        event.sender.send('svn:apply-progress', { taskId, ...progress });
+      }
+    };
+    return svn.applyToLocal(repository, relativePath, kind, destination, sendProgress);
   });
 
   ipcMain.handle('svn:copy-to-clipboard', async (_event, repositoryId, relativePaths) => {

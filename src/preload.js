@@ -13,8 +13,13 @@ contextBridge.exposeInMainWorld('svnBrowser', {
     list: (repositoryId, relativePath) => ipcRenderer.invoke('svn:list', repositoryId, relativePath),
     search: (repositoryId, keyword) => ipcRenderer.invoke('svn:search', repositoryId, keyword),
     export: (repositoryId, relativePath) => ipcRenderer.invoke('svn:export', repositoryId, relativePath),
-    applyToLocal: (repositoryId, relativePath) =>
-      ipcRenderer.invoke('svn:apply-to-local', repositoryId, relativePath),
+    applyToLocal: (repositoryId, relativePath, kind, taskId) =>
+      ipcRenderer.invoke('svn:apply-to-local', repositoryId, relativePath, kind, taskId),
+    onApplyProgress: (callback) => {
+      const listener = (_event, progress) => callback(progress);
+      ipcRenderer.on('svn:apply-progress', listener);
+      return () => ipcRenderer.removeListener('svn:apply-progress', listener);
+    },
     copyToClipboard: (repositoryId, relativePaths) =>
       ipcRenderer.invoke('svn:copy-to-clipboard', repositoryId, relativePaths)
   },

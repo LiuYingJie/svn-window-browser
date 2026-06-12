@@ -53,7 +53,7 @@ class SvnService {
     this.getExecutable = getExecutable;
   }
 
-  run(args, repository) {
+  run(args, repository, options = {}) {
     const executable = this.getExecutable() || 'svn';
     const authArgs = ['--non-interactive'];
     if (repository.username) authArgs.push('--username', repository.username);
@@ -68,8 +68,14 @@ class SvnService {
       let stderr = '';
       child.stdout.setEncoding('utf8');
       child.stderr.setEncoding('utf8');
-      child.stdout.on('data', (data) => { stdout += data; });
-      child.stderr.on('data', (data) => { stderr += data; });
+      child.stdout.on('data', (data) => {
+        stdout += data;
+        options.onOutput?.(data);
+      });
+      child.stderr.on('data', (data) => {
+        stderr += data;
+        options.onOutput?.(data);
+      });
       child.on('error', (error) => {
         if (error.code === 'ENOENT') {
           reject(new Error('未找到 SVN 命令行客户端。请安装 TortoiseSVN 命令行工具，或在设置中选择 svn.exe。'));
@@ -126,10 +132,43 @@ class SvnService {
     return destination;
   }
 
-  async exportToLocal(repository, relativePath, destination) {
-    fs.mkdirSync(path.dirname(destination), { recursive: true });
-    await this.run(['export', '--force', this.buildUrl(repository, relativePath), destination], repository);
-    return destination;
+  async isVersioned(repository, targetPath) {
+    try {
+      await this.run(['info', '--show-item', 'wc-root', targetPath], repository);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async applyToLocal(repository, relativePath, kind, destination, onProgress = () => {}) {
+    const isFile = kind === 'file';
+    const checkoutRelativePath = isFile
+      ? relativePath.split('/').slice(0, -1).join('/')
+      : relativePath;
+    const workingCopyPath = isFile ? path.dirname(destination) : destination;
+    const updatePath = isFile ? workingCopyPath : destination;
+
+    onProgress({ phase: 'checking', message: '正在检查本地工作副本...' });
+    if (await this.isVersioned(repository, updatePath)) {
+      onProgress({ phase: 'updating', message: `正在更新：${updatePath}` });
+      await this.run(['update', updatePath], repository, {
+        onOutput: (output) => onProgress({ phase: 'updating', message: output })
+      });
+      return { destination, workingCopyPath, action: 'updated' };
+    }
+
+    fs.mkdirSync(path.dirname(workingCopyPath), { recursive: true });
+    onProgress({ phase: 'checking-out', message: `正在检出：${workingCopyPath}` });
+    await this.run([
+      'checkout',
+      '--force',
+      this.buildUrl(repository, checkoutRelativePath),
+      workingCopyPath
+    ], repository, {
+      onOutput: (output) => onProgress({ phase: 'checking-out', message: output })
+    });
+    return { destination, workingCopyPath, action: 'checked-out' };
   }
 
   async exportMany(repository, relativePaths, destinationDirectory) {
