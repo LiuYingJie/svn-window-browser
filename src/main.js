@@ -6,6 +6,7 @@ const { SvnService } = require('./svn-service');
 const { detectSvnClient } = require('./client-detector');
 const { copyFilesToClipboard } = require('./windows-clipboard');
 const { CacheManager } = require('./cache-manager');
+const { UpdateService } = require('./update-service');
 const {
   clearLocalDirectory,
   resolveLocalResource,
@@ -17,6 +18,7 @@ let store;
 let svn;
 let cacheManager;
 let cacheCleanupTimer;
+let updateService;
 
 function detectClient() {
   const bundledExecutables = app.isPackaged
@@ -144,11 +146,16 @@ function registerHandlers() {
 
   ipcMain.handle('settings:get', () => ({
     ...store.getSettings(),
-    client: detectClient()
+    client: detectClient(),
+    update: updateService.getStatus(),
+    appVersion: app.getVersion()
   }));
   ipcMain.handle('settings:set-view-mode', (_event, viewMode) => {
     if (!['list', 'icons'].includes(viewMode)) throw new Error('不支持的视图模式');
     return store.saveSettings({ viewMode });
+  });
+  ipcMain.handle('settings:set-check-updates', (_event, checkUpdates) => {
+    return store.saveSettings({ checkUpdates: Boolean(checkUpdates) });
   });
   ipcMain.handle('settings:detect-client', () => {
     const client = detectClient();
@@ -171,6 +178,11 @@ function registerHandlers() {
     shell.openExternal('https://subversion.apache.org/packages.html#windows');
   });
 
+  ipcMain.handle('updates:check', (_event, options) => updateService.check(options));
+  ipcMain.handle('updates:download-and-install', (_event, updateInfo) =>
+    updateService.downloadAndInstall(updateInfo)
+  );
+
   ipcMain.handle('system:show-item', (_event, targetPath) => {
     if (targetPath) shell.showItemInFolder(targetPath);
   });
@@ -182,6 +194,7 @@ app.whenReady().then(async () => {
     decrypt: (value) => safeStorage.decryptString(Buffer.from(value, 'base64'))
   };
   store = new JsonStore(path.join(app.getPath('userData'), 'data.json'), passwordCodec);
+  updateService = new UpdateService({ store, currentVersion: app.getVersion() });
   cacheManager = new CacheManager(path.join(app.getPath('temp'), 'svn-browser-clipboard'));
   cacheManager.cleanup();
   cacheCleanupTimer = setInterval(() => cacheManager.cleanup(), 60 * 60 * 1000);

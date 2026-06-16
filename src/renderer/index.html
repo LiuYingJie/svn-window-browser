@@ -28,13 +28,9 @@
         <nav id="repository-list" class="repository-list"></nav>
 
         <div class="sidebar-actions">
-          <button id="cache-button" class="settings-button">
-            <span>▣</span>
-            缓存
-          </button>
           <button id="settings-button" class="settings-button">
             <span>⚙</span>
-            SVN 客户端设置
+            设置
           </button>
         </div>
       </aside>
@@ -167,49 +163,64 @@
     <dialog id="settings-dialog">
       <div class="dialog-heading">
         <div>
-          <h2>SVN 客户端设置</h2>
-          <p>应用需要 SVN 命令行客户端来访问仓库。</p>
+          <h2>设置</h2>
+          <p>管理客户端、缓存、版本检测和版本信息。</p>
         </div>
         <button type="button" class="dialog-close" data-close-dialog>×</button>
       </div>
-      <div class="setting-card">
-        <div id="client-status" class="client-status"></div>
-        <strong>命令行客户端路径</strong>
-        <code id="svn-path">正在自动检测...</code>
+      <div class="settings-tabs" role="tablist" aria-label="设置分类">
+        <button class="settings-tab active" type="button" data-settings-tab="general">通用</button>
+        <button class="settings-tab" type="button" data-settings-tab="cache">缓存</button>
+        <button class="settings-tab" type="button" data-settings-tab="updates">版本检测</button>
+        <button class="settings-tab" type="button" data-settings-tab="version">版本</button>
+      </div>
+      <div id="settings-panel-general" class="settings-panel active">
+        <div class="setting-card">
+          <div id="client-status" class="client-status"></div>
+          <strong>SVN 命令行客户端</strong>
+          <code id="svn-path">正在自动检测...</code>
+          <div class="setting-actions">
+            <button id="detect-svn-button" class="button secondary">重新检测</button>
+            <button id="choose-svn-button" class="button secondary">手动选择</button>
+            <button id="download-svn-button" class="button primary">获取命令行客户端</button>
+          </div>
+        </div>
+      </div>
+      <div id="settings-panel-cache" class="settings-panel">
+        <div class="cache-summary">
+          <div>
+            <span>缓存大小</span>
+            <strong id="cache-size">正在统计...</strong>
+          </div>
+          <div>
+            <span>文件数量</span>
+            <strong id="cache-file-count">-</strong>
+          </div>
+          <div>
+            <span>缓存批次</span>
+            <strong id="cache-batch-count">-</strong>
+          </div>
+        </div>
+        <p class="cache-note">缓存保留 24 小时，且最多占用 2 GB；超出后会自动从最旧的缓存开始清理。</p>
         <div class="setting-actions">
-          <button id="detect-svn-button" class="button secondary">重新检测</button>
-          <button id="choose-svn-button" class="button secondary">手动选择</button>
-          <button id="download-svn-button" class="button primary">获取命令行客户端</button>
+          <button id="clear-cache-button" type="button" class="button danger">清空缓存</button>
         </div>
       </div>
-    </dialog>
-
-    <dialog id="cache-dialog">
-      <div class="dialog-heading">
-        <div>
-          <h2>缓存管理</h2>
-          <p>Ctrl+C 时下载的临时文件会保存在这里。</p>
-        </div>
-        <button type="button" class="dialog-close" data-close-dialog>×</button>
-      </div>
-      <div class="cache-summary">
-        <div>
-          <span>缓存大小</span>
-          <strong id="cache-size">正在统计...</strong>
-        </div>
-        <div>
-          <span>文件数量</span>
-          <strong id="cache-file-count">-</strong>
-        </div>
-        <div>
-          <span>缓存批次</span>
-          <strong id="cache-batch-count">-</strong>
+      <div id="settings-panel-updates" class="settings-panel">
+        <div id="update-setting-card" class="setting-card update-setting-card">
+          <label class="checkbox-setting">
+            <input id="check-updates-input" type="checkbox">
+            <span>自动检测新版本</span>
+          </label>
+          <p id="update-support-message" class="field-hint"></p>
+          <p id="install-directory" class="field-hint"></p>
         </div>
       </div>
-      <p class="cache-note">缓存保留 24 小时，且最多占用 2 GB；超出后会自动从最旧的缓存开始清理。</p>
-      <div class="dialog-actions">
-        <button type="button" class="button secondary" data-close-dialog>关闭</button>
-        <button id="clear-cache-button" type="button" class="button danger">清空缓存</button>
+      <div id="settings-panel-version" class="settings-panel">
+        <div class="setting-card version-card">
+          <span>当前版本</span>
+          <strong id="app-version">-</strong>
+        </div>
       </div>
     </dialog>
 
@@ -252,6 +263,20 @@
     </aside>
 
     <div id="toast" class="toast hidden"></div>
+    <div id="update-notice" class="update-notice hidden">
+      <strong id="update-notice-title">发现新版本</strong>
+      <span id="update-notice-detail"></span>
+      <div class="update-notice-actions">
+        <button id="install-update-button" type="button" class="button primary">更新</button>
+        <button id="dismiss-update-button" type="button" class="button secondary">关闭</button>
+      </div>
+    </div>
+    <div id="update-blocker" class="update-blocker hidden">
+      <div>
+        <strong>正在更新</strong>
+        <span>请等待安装程序启动。</span>
+      </div>
+    </div>
     <script src="app.js"></script>
   </body>
 </html>

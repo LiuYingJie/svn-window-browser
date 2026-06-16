@@ -2,3 +2,6 @@ node_modules/
 dist/
 release/
 *.log
+/config.json
+/RemoteVersionConfig.json
+/build-private/

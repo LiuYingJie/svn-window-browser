@@ -63,3 +63,18 @@ test('JsonStore persists the selected view mode', () => {
   assert.equal(new JsonStore(filePath).getSettings().viewMode, 'icons');
   fs.rmSync(directory, { recursive: true, force: true });
 });
+
+test('JsonStore persists update settings', () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'svn-browser-update-settings-'));
+  const filePath = path.join(directory, 'data.json');
+  const store = new JsonStore(filePath);
+  store.saveSettings({
+    checkUpdates: false,
+    lastUpdateCheckAt: '2026-06-16T00:00:00.000Z'
+  });
+
+  const settings = new JsonStore(filePath).getSettings();
+  assert.equal(settings.checkUpdates, false);
+  assert.equal(settings.lastUpdateCheckAt, '2026-06-16T00:00:00.000Z');
+  fs.rmSync(directory, { recursive: true, force: true });
+});

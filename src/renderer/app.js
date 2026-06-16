@@ -12,7 +12,8 @@ const state = {
   selectionAnchor: null,
   loading: false,
   contextEntry: null,
-  backgroundTasks: new Map()
+  backgroundTasks: new Map(),
+  pendingUpdateInfo: null
 };
 
 let marqueeSelection = null;
@@ -55,8 +56,8 @@ const elements = {
   manualAccountFields: document.querySelector('#manual-account-fields'),
   settingsButton: document.querySelector('#settings-button'),
   settingsDialog: document.querySelector('#settings-dialog'),
-  cacheButton: document.querySelector('#cache-button'),
-  cacheDialog: document.querySelector('#cache-dialog'),
+  settingsTabs: document.querySelectorAll('[data-settings-tab]'),
+  settingsPanels: document.querySelectorAll('.settings-panel'),
   cacheSize: document.querySelector('#cache-size'),
   cacheFileCount: document.querySelector('#cache-file-count'),
   cacheBatchCount: document.querySelector('#cache-batch-count'),
@@ -72,13 +73,24 @@ const elements = {
   detectSvn: document.querySelector('#detect-svn-button'),
   chooseSvn: document.querySelector('#choose-svn-button'),
   downloadSvn: document.querySelector('#download-svn-button'),
+  updateSettingCard: document.querySelector('#update-setting-card'),
+  checkUpdatesInput: document.querySelector('#check-updates-input'),
+  updateSupportMessage: document.querySelector('#update-support-message'),
+  installDirectory: document.querySelector('#install-directory'),
+  appVersion: document.querySelector('#app-version'),
   contextMenu: document.querySelector('#resource-context-menu'),
   applyToLocal: document.querySelector('#apply-to-local-button'),
   createFolderContext: document.querySelector('#create-folder-context-button'),
   backgroundTasks: document.querySelector('#background-tasks'),
   backgroundTaskCount: document.querySelector('#background-task-count'),
   backgroundTaskList: document.querySelector('#background-task-list'),
-  toast: document.querySelector('#toast')
+  toast: document.querySelector('#toast'),
+  updateNotice: document.querySelector('#update-notice'),
+  updateNoticeTitle: document.querySelector('#update-notice-title'),
+  updateNoticeDetail: document.querySelector('#update-notice-detail'),
+  installUpdate: document.querySelector('#install-update-button'),
+  dismissUpdate: document.querySelector('#dismiss-update-button'),
+  updateBlocker: document.querySelector('#update-blocker')
 };
 
 function activeRepository() {
@@ -884,7 +896,64 @@ function goBack() {
 async function openSettings() {
   const settings = await window.svnBrowser.settings.get();
   renderClientStatus(settings.client);
+  renderUpdateSettings(settings);
+  elements.appVersion.textContent = settings.appVersion || '-';
+  activateSettingsTab('general');
   elements.settingsDialog.showModal();
+}
+
+async function activateSettingsTab(tabName) {
+  elements.settingsTabs.forEach((tab) => {
+    tab.classList.toggle('active', tab.dataset.settingsTab === tabName);
+  });
+  elements.settingsPanels.forEach((panel) => {
+    panel.classList.toggle('active', panel.id === `settings-panel-${tabName}`);
+  });
+  if (tabName === 'cache') await loadCacheStats();
+}
+
+function renderUpdateSettings(settings) {
+  const supported = Boolean(settings.update?.supported);
+  elements.checkUpdatesInput.checked = settings.checkUpdates !== false;
+  elements.checkUpdatesInput.disabled = !supported;
+  elements.updateSupportMessage.textContent = supported
+    ? '此安装包支持版本检测，可在这里关闭自动检测。'
+    : '当前安装包未启用版本检测。';
+  elements.installDirectory.textContent = settings.update?.installDirectory
+    ? `安装目录：${settings.update.installDirectory}`
+    : '';
+}
+
+function showUpdateNotice(updateInfo) {
+  state.pendingUpdateInfo = updateInfo;
+  elements.updateNoticeTitle.textContent = `发现新版本 ${updateInfo.remoteVersion}`;
+  elements.updateNoticeDetail.textContent = `当前版本 ${updateInfo.currentVersion}，可以立即更新。`;
+  elements.updateNotice.classList.remove('hidden');
+}
+
+function hideUpdateNotice() {
+  elements.updateNotice.classList.add('hidden');
+}
+
+async function checkForUpdates() {
+  try {
+    const result = await window.svnBrowser.updates.check();
+    if (result.updateAvailable) showUpdateNotice(result);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+async function installUpdate() {
+  if (!state.pendingUpdateInfo) return;
+  hideUpdateNotice();
+  elements.updateBlocker.classList.remove('hidden');
+  try {
+    await window.svnBrowser.updates.downloadAndInstall(state.pendingUpdateInfo);
+  } catch (error) {
+    elements.updateBlocker.classList.add('hidden');
+    showToast(errorMessage(error), 'error');
+  }
 }
 
 function formatBytes(bytes) {
@@ -906,12 +975,11 @@ function renderCacheStats(stats) {
   elements.clearCache.disabled = stats.bytes === 0;
 }
 
-async function openCache() {
+async function loadCacheStats() {
   elements.cacheSize.textContent = '正在统计...';
   elements.cacheFileCount.textContent = '-';
   elements.cacheBatchCount.textContent = '-';
   elements.clearCache.disabled = true;
-  elements.cacheDialog.showModal();
   try {
     renderCacheStats(await window.svnBrowser.cache.getStats());
   } catch (error) {
@@ -958,6 +1026,7 @@ async function initialize() {
   state.savedAccounts = savedAccounts;
   applyViewMode(settings.viewMode);
   renderRepositories();
+  checkForUpdates();
   if (state.repositories.length > 0) {
     await selectRepository(state.repositories[0].id);
   }
@@ -985,8 +1054,10 @@ elements.createFolder.addEventListener('click', openCreateFolderDialog);
 elements.copySelected.addEventListener('click', copySelectionToClipboard);
 elements.exportCurrent.addEventListener('click', () => exportPath(state.currentPath));
 elements.settingsButton.addEventListener('click', openSettings);
-elements.cacheButton.addEventListener('click', openCache);
 elements.clearCache.addEventListener('click', clearCache);
+elements.settingsTabs.forEach((tab) => {
+  tab.addEventListener('click', () => activateSettingsTab(tab.dataset.settingsTab));
+});
 elements.chooseSvn.addEventListener('click', async () => {
   const client = await window.svnBrowser.settings.chooseSvn();
   if (client) {
@@ -1000,6 +1071,15 @@ elements.detectSvn.addEventListener('click', async () => {
   showToast(client.ready ? '已找到 SVN 命令行客户端' : '仍未找到 SVN 命令行客户端', client.ready ? 'success' : 'error');
 });
 elements.downloadSvn.addEventListener('click', () => window.svnBrowser.settings.openDownload());
+elements.checkUpdatesInput.addEventListener('change', async () => {
+  try {
+    await window.svnBrowser.settings.setCheckUpdates(elements.checkUpdatesInput.checked);
+  } catch (error) {
+    showToast(errorMessage(error), 'error');
+  }
+});
+elements.installUpdate.addEventListener('click', installUpdate);
+elements.dismissUpdate.addEventListener('click', hideUpdateNotice);
 elements.applyToLocal.addEventListener('click', applyEntryToLocal);
 elements.createFolderContext.addEventListener('click', openCreateFolderDialog);
 elements.createFolderForm.addEventListener('submit', createFolder);

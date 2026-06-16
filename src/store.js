@@ -11,7 +11,9 @@ class JsonStore {
       repositories: [],
       settings: {
         svnExecutable: '',
-        viewMode: 'list'
+        viewMode: 'list',
+        checkUpdates: true,
+        lastUpdateCheckAt: ''
       }
     };
     this.load();
@@ -24,7 +26,9 @@ class JsonStore {
         repositories: Array.isArray(parsed.repositories) ? parsed.repositories : [],
         settings: {
           svnExecutable: parsed.settings?.svnExecutable || '',
-          viewMode: parsed.settings?.viewMode === 'icons' ? 'icons' : 'list'
+          viewMode: parsed.settings?.viewMode === 'icons' ? 'icons' : 'list',
+          checkUpdates: parsed.settings?.checkUpdates !== false,
+          lastUpdateCheckAt: parsed.settings?.lastUpdateCheckAt || ''
         }
       };
     } catch (error) {

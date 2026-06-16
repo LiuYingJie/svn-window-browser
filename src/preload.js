@@ -32,9 +32,14 @@ contextBridge.exposeInMainWorld('svnBrowser', {
   settings: {
     get: () => ipcRenderer.invoke('settings:get'),
     setViewMode: (viewMode) => ipcRenderer.invoke('settings:set-view-mode', viewMode),
+    setCheckUpdates: (checkUpdates) => ipcRenderer.invoke('settings:set-check-updates', checkUpdates),
     chooseSvn: () => ipcRenderer.invoke('settings:choose-svn'),
     detectClient: () => ipcRenderer.invoke('settings:detect-client'),
     openDownload: () => ipcRenderer.invoke('settings:open-download')
+  },
+  updates: {
+    check: (options) => ipcRenderer.invoke('updates:check', options),
+    downloadAndInstall: (updateInfo) => ipcRenderer.invoke('updates:download-and-install', updateInfo)
   },
   system: {
     showItem: (targetPath) => ipcRenderer.invoke('system:show-item', targetPath)
