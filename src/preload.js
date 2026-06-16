@@ -39,7 +39,12 @@ contextBridge.exposeInMainWorld('svnBrowser', {
   },
   updates: {
     check: (options) => ipcRenderer.invoke('updates:check', options),
-    downloadAndInstall: (updateInfo) => ipcRenderer.invoke('updates:download-and-install', updateInfo)
+    downloadAndInstall: (updateInfo) => ipcRenderer.invoke('updates:download-and-install', updateInfo),
+    onDownloadProgress: (callback) => {
+      const listener = (_event, progress) => callback(progress);
+      ipcRenderer.on('updates:download-progress', listener);
+      return () => ipcRenderer.removeListener('updates:download-progress', listener);
+    }
   },
   system: {
     showItem: (targetPath) => ipcRenderer.invoke('system:show-item', targetPath)

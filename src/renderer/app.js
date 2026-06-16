@@ -77,6 +77,8 @@ const elements = {
   checkUpdatesInput: document.querySelector('#check-updates-input'),
   updateSupportMessage: document.querySelector('#update-support-message'),
   installDirectory: document.querySelector('#install-directory'),
+  updateDebugActions: document.querySelector('#update-debug-actions'),
+  testUpdateCheck: document.querySelector('#test-update-check-button'),
   appVersion: document.querySelector('#app-version'),
   contextMenu: document.querySelector('#resource-context-menu'),
   applyToLocal: document.querySelector('#apply-to-local-button'),
@@ -90,7 +92,10 @@ const elements = {
   updateNoticeDetail: document.querySelector('#update-notice-detail'),
   installUpdate: document.querySelector('#install-update-button'),
   dismissUpdate: document.querySelector('#dismiss-update-button'),
-  updateBlocker: document.querySelector('#update-blocker')
+  updateBlocker: document.querySelector('#update-blocker'),
+  updateDownloadMessage: document.querySelector('#update-download-message'),
+  updateDownloadProgressBar: document.querySelector('#update-download-progress-bar'),
+  updateDownloadDetail: document.querySelector('#update-download-detail')
 };
 
 function activeRepository() {
@@ -105,7 +110,13 @@ function showToast(message, type = 'success') {
   elements.toast.textContent = message;
   elements.toast.className = `toast ${type === 'error' ? 'error' : ''}`;
   clearTimeout(showToast.timeout);
-  showToast.timeout = setTimeout(() => elements.toast.classList.add('hidden'), 4200);
+  if (elements.toast.open) elements.toast.close();
+  elements.toast.classList.remove('hidden');
+  elements.toast.showModal();
+  showToast.timeout = setTimeout(() => {
+    if (elements.toast.open) elements.toast.close();
+    elements.toast.classList.add('hidden');
+  }, 4200);
 }
 
 function errorMessage(error) {
@@ -916,6 +927,8 @@ function renderUpdateSettings(settings) {
   const supported = Boolean(settings.update?.supported);
   elements.checkUpdatesInput.checked = settings.checkUpdates !== false;
   elements.checkUpdatesInput.disabled = !supported;
+  elements.updateDebugActions.classList.toggle('hidden', settings.debug?.showUpdateTestButton !== true);
+  elements.testUpdateCheck.disabled = false;
   elements.updateSupportMessage.textContent = supported
     ? '此安装包支持版本检测，可在这里关闭自动检测。'
     : '当前安装包未启用版本检测。';
@@ -929,9 +942,11 @@ function showUpdateNotice(updateInfo) {
   elements.updateNoticeTitle.textContent = `发现新版本 ${updateInfo.remoteVersion}`;
   elements.updateNoticeDetail.textContent = `当前版本 ${updateInfo.currentVersion}，可以立即更新。`;
   elements.updateNotice.classList.remove('hidden');
+  if (!elements.updateNotice.open) elements.updateNotice.showModal();
 }
 
 function hideUpdateNotice() {
+  if (elements.updateNotice.open) elements.updateNotice.close();
   elements.updateNotice.classList.add('hidden');
 }
 
@@ -944,16 +959,44 @@ async function checkForUpdates() {
   }
 }
 
+async function testCheckForUpdates() {
+  elements.testUpdateCheck.disabled = true;
+  try {
+    const result = await window.svnBrowser.updates.check({ force: true });
+    if (result.updateAvailable) {
+      showUpdateNotice(result);
+    } else if (result.supported) {
+      showToast(result.remoteVersion ? `当前已是最新版本：${result.remoteVersion}` : '当前没有可用更新');
+    } else {
+      showToast('当前安装包未启用版本检测', 'error');
+    }
+  } catch (error) {
+    showToast(errorMessage(error), 'error');
+  } finally {
+    elements.testUpdateCheck.disabled = false;
+  }
+}
+
 async function installUpdate() {
   if (!state.pendingUpdateInfo) return;
   hideUpdateNotice();
   elements.updateBlocker.classList.remove('hidden');
+  elements.updateDownloadMessage.textContent = '正在准备下载...';
+  elements.updateDownloadProgressBar.style.width = '0%';
+  elements.updateDownloadDetail.textContent = '';
+  if (!elements.updateBlocker.open) elements.updateBlocker.showModal();
   try {
     await window.svnBrowser.updates.downloadAndInstall(state.pendingUpdateInfo);
   } catch (error) {
+    if (elements.updateBlocker.open) elements.updateBlocker.close();
     elements.updateBlocker.classList.add('hidden');
     showToast(errorMessage(error), 'error');
   }
+}
+
+function formatDownloadProgress(progress) {
+  if (!progress.totalBytes) return `${formatBytes(progress.downloadedBytes)} 已下载`;
+  return `${formatBytes(progress.downloadedBytes)} / ${formatBytes(progress.totalBytes)}`;
 }
 
 function formatBytes(bytes) {
@@ -1071,6 +1114,7 @@ elements.detectSvn.addEventListener('click', async () => {
   showToast(client.ready ? '已找到 SVN 命令行客户端' : '仍未找到 SVN 命令行客户端', client.ready ? 'success' : 'error');
 });
 elements.downloadSvn.addEventListener('click', () => window.svnBrowser.settings.openDownload());
+elements.testUpdateCheck.addEventListener('click', testCheckForUpdates);
 elements.checkUpdatesInput.addEventListener('change', async () => {
   try {
     await window.svnBrowser.settings.setCheckUpdates(elements.checkUpdatesInput.checked);
@@ -1083,6 +1127,11 @@ elements.dismissUpdate.addEventListener('click', hideUpdateNotice);
 elements.applyToLocal.addEventListener('click', applyEntryToLocal);
 elements.createFolderContext.addEventListener('click', openCreateFolderDialog);
 elements.createFolderForm.addEventListener('submit', createFolder);
+window.svnBrowser.updates.onDownloadProgress((progress) => {
+  elements.updateDownloadMessage.textContent = progress.message || '正在下载更新...';
+  elements.updateDownloadProgressBar.style.width = `${progress.percent ?? 12}%`;
+  elements.updateDownloadDetail.textContent = formatDownloadProgress(progress);
+});
 window.svnBrowser.svn.onApplyProgress((progress) => {
   const message = progressMessage(progress.message);
   if (message) updateBackgroundTask(progress.taskId, { message });

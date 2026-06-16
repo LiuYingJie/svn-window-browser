@@ -3,6 +3,7 @@ const path = require('node:path');
 const { app, shell } = require('electron');
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+const UPDATE_DOWNLOAD_DIR = 'svn-browser-updates';
 
 function normalizeConfig(raw) {
   const manifestUrl = typeof raw?.newVersionLink === 'string' ? raw.newVersionLink.trim() : '';
@@ -51,6 +52,7 @@ class UpdateService {
     this.store = store;
     this.currentVersion = currentVersion;
     this.config = readUpdateConfig();
+    this.downloadDirectory = path.join(app.getPath('temp'), UPDATE_DOWNLOAD_DIR);
   }
 
   getStatus() {
@@ -63,14 +65,16 @@ class UpdateService {
 
   async check({ force = false } = {}) {
     const settings = this.store.getSettings();
-    if (!this.config.enabled || settings.checkUpdates === false) {
+    if (!this.config.enabled || (!force && settings.checkUpdates === false)) {
       return { supported: this.config.enabled, updateAvailable: false, skipped: true };
     }
     if (!force && !shouldCheckToday(settings.lastUpdateCheckAt)) {
       return { supported: true, updateAvailable: false, skipped: true };
     }
 
-    this.store.saveSettings({ lastUpdateCheckAt: new Date().toISOString() });
+    if (!force) {
+      this.store.saveSettings({ lastUpdateCheckAt: new Date().toISOString() });
+    }
     const response = await fetch(this.config.manifestUrl, { cache: 'no-store' });
     if (!response.ok) {
       throw new Error(`更新配置读取失败：HTTP ${response.status}`);
@@ -93,20 +97,73 @@ class UpdateService {
     };
   }
 
-  async downloadAndInstall(updateInfo) {
+  cleanupDownloads() {
+    try {
+      fs.rmSync(this.downloadDirectory, { recursive: true, force: true });
+    } catch (error) {
+      console.error('Could not clean update downloads:', error);
+    }
+  }
+
+  async downloadAndInstall(updateInfo, onProgress = () => {}) {
     const downloadUrl = typeof updateInfo?.downloadUrl === 'string' ? updateInfo.downloadUrl : '';
     if (!this.config.enabled || !downloadUrl) {
       throw new Error('没有可用的更新下载地址');
     }
 
+    this.cleanupDownloads();
+    fs.mkdirSync(this.downloadDirectory, { recursive: true });
     const response = await fetch(downloadUrl);
     if (!response.ok) {
       throw new Error(`更新下载失败：HTTP ${response.status}`);
     }
     const fileName = path.basename(new URL(downloadUrl).pathname) || `SVN-Browser-${Date.now()}.exe`;
-    const installerPath = path.join(app.getPath('temp'), fileName);
-    const buffer = Buffer.from(await response.arrayBuffer());
-    fs.writeFileSync(installerPath, buffer);
+    const installerPath = path.join(this.downloadDirectory, fileName);
+    const totalBytes = Number.parseInt(response.headers.get('content-length') || '0', 10) || 0;
+    let downloadedBytes = 0;
+
+    onProgress({ downloadedBytes, totalBytes, percent: 0, message: '开始下载更新...' });
+    if (!response.body) {
+      const buffer = Buffer.from(await response.arrayBuffer());
+      fs.writeFileSync(installerPath, buffer);
+      onProgress({
+        downloadedBytes: buffer.length,
+        totalBytes: buffer.length,
+        percent: 100,
+        message: '更新下载完成，正在启动安装程序...'
+      });
+    } else {
+      const reader = response.body.getReader();
+      const output = fs.createWriteStream(installerPath);
+      const writeComplete = new Promise((resolve, reject) => {
+        output.on('finish', resolve);
+        output.on('error', reject);
+      });
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          const chunk = Buffer.from(value);
+          downloadedBytes += chunk.length;
+          output.write(chunk);
+          onProgress({
+            downloadedBytes,
+            totalBytes,
+            percent: totalBytes ? Math.min(100, Math.round((downloadedBytes / totalBytes) * 100)) : null,
+            message: '正在下载更新...'
+          });
+        }
+      } finally {
+        output.end();
+      }
+      await writeComplete;
+      onProgress({
+        downloadedBytes,
+        totalBytes,
+        percent: 100,
+        message: '更新下载完成，正在启动安装程序...'
+      });
+    }
 
     const openError = await shell.openPath(installerPath);
     if (openError) throw new Error(openError);
@@ -117,6 +174,7 @@ class UpdateService {
 
 module.exports = {
   DAY_MS,
+  UPDATE_DOWNLOAD_DIR,
   UpdateService,
   compareVersions,
   readUpdateConfig,

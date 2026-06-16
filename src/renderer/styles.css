@@ -608,24 +608,33 @@ input:focus { border-color: #7796ed; box-shadow: 0 0 0 3px #3867e81a; }
 .cache-note { margin: 16px 0 20px; color: var(--muted); font-size: 13px; line-height: 1.6; }
 .toast {
   position: fixed;
+  top: auto;
   right: 24px;
   bottom: 24px;
+  left: auto;
   z-index: 20;
+  width: auto;
   max-width: 460px;
+  margin: 0;
   padding: 13px 16px;
+  border: 0;
   color: #fff;
   border-radius: 9px;
   background: #202b40;
   box-shadow: 0 10px 30px #1118274d;
 }
+.toast::backdrop { background: transparent; backdrop-filter: none; }
 .toast.error { background: #b9373e; }
 .background-tasks:not(.hidden) ~ .toast { bottom: 330px; }
 .update-notice {
   position: fixed;
+  top: auto;
   right: 24px;
   bottom: 24px;
+  left: auto;
   z-index: 24;
   width: 340px;
+  margin: 0;
   padding: 16px;
   border: 1px solid #cbd7f2;
   border-radius: 10px;
@@ -633,6 +642,7 @@ input:focus { border-color: #7796ed; box-shadow: 0 0 0 3px #3867e81a; }
   background: #fff;
   box-shadow: 0 16px 42px #11182733;
 }
+.update-notice::backdrop { background: transparent; backdrop-filter: none; }
 .update-notice strong,
 .update-notice span {
   display: block;
@@ -653,10 +663,20 @@ input:focus { border-color: #7796ed; box-shadow: 0 0 0 3px #3867e81a; }
   position: fixed;
   inset: 0;
   z-index: 100;
-  display: grid;
+  display: none;
+  width: 100vw;
+  max-width: none;
+  height: 100vh;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
   place-items: center;
-  background: #11182799;
+  background: transparent;
+  box-shadow: none;
 }
+.update-blocker[open] { display: grid; }
+.update-blocker::backdrop { background: #11182799; backdrop-filter: blur(2px); }
 .update-blocker > div {
   width: 300px;
   padding: 22px;
@@ -674,6 +694,27 @@ input:focus { border-color: #7796ed; box-shadow: 0 0 0 3px #3867e81a; }
   margin-top: 8px;
   color: #68748a;
   font-size: 13px;
+}
+.update-blocker small {
+  display: block;
+  margin-top: 8px;
+  color: #7b8798;
+  font-size: 12px;
+}
+.update-download-progress {
+  height: 8px;
+  margin-top: 16px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e6ebf4;
+}
+.update-download-progress i {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--primary);
+  transition: width .18s ease;
 }
 .context-menu {
   position: fixed;

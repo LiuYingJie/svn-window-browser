@@ -214,6 +214,9 @@
           </label>
           <p id="update-support-message" class="field-hint"></p>
           <p id="install-directory" class="field-hint"></p>
+          <div id="update-debug-actions" class="setting-actions hidden">
+            <button id="test-update-check-button" type="button" class="button secondary">检查更新-测试</button>
+          </div>
         </div>
       </div>
       <div id="settings-panel-version" class="settings-panel">
@@ -262,21 +265,25 @@
       <div id="background-task-list" class="background-task-list"></div>
     </aside>
 
-    <div id="toast" class="toast hidden"></div>
-    <div id="update-notice" class="update-notice hidden">
+    <dialog id="toast" class="toast hidden"></dialog>
+    <dialog id="update-notice" class="update-notice hidden">
       <strong id="update-notice-title">发现新版本</strong>
       <span id="update-notice-detail"></span>
       <div class="update-notice-actions">
         <button id="install-update-button" type="button" class="button primary">更新</button>
         <button id="dismiss-update-button" type="button" class="button secondary">关闭</button>
       </div>
-    </div>
-    <div id="update-blocker" class="update-blocker hidden">
+    </dialog>
+    <dialog id="update-blocker" class="update-blocker hidden">
       <div>
         <strong>正在更新</strong>
-        <span>请等待安装程序启动。</span>
+        <span id="update-download-message">正在准备下载...</span>
+        <div class="update-download-progress">
+          <i id="update-download-progress-bar"></i>
+        </div>
+        <small id="update-download-detail"></small>
       </div>
-    </div>
+    </dialog>
     <script src="app.js"></script>
   </body>
 </html>

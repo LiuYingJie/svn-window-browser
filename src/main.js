@@ -7,6 +7,7 @@ const { detectSvnClient } = require('./client-detector');
 const { copyFilesToClipboard } = require('./windows-clipboard');
 const { CacheManager } = require('./cache-manager');
 const { UpdateService } = require('./update-service');
+const { readDebugConfig } = require('./debug-config');
 const {
   clearLocalDirectory,
   resolveLocalResource,
@@ -19,6 +20,7 @@ let svn;
 let cacheManager;
 let cacheCleanupTimer;
 let updateService;
+let debugConfig;
 
 function detectClient() {
   const bundledExecutables = app.isPackaged
@@ -148,7 +150,8 @@ function registerHandlers() {
     ...store.getSettings(),
     client: detectClient(),
     update: updateService.getStatus(),
-    appVersion: app.getVersion()
+    appVersion: app.getVersion(),
+    debug: debugConfig
   }));
   ipcMain.handle('settings:set-view-mode', (_event, viewMode) => {
     if (!['list', 'icons'].includes(viewMode)) throw new Error('不支持的视图模式');
@@ -179,8 +182,12 @@ function registerHandlers() {
   });
 
   ipcMain.handle('updates:check', (_event, options) => updateService.check(options));
-  ipcMain.handle('updates:download-and-install', (_event, updateInfo) =>
-    updateService.downloadAndInstall(updateInfo)
+  ipcMain.handle('updates:download-and-install', (event, updateInfo) =>
+    updateService.downloadAndInstall(updateInfo, (progress) => {
+      if (!event.sender.isDestroyed()) {
+        event.sender.send('updates:download-progress', progress);
+      }
+    })
   );
 
   ipcMain.handle('system:show-item', (_event, targetPath) => {
@@ -194,7 +201,9 @@ app.whenReady().then(async () => {
     decrypt: (value) => safeStorage.decryptString(Buffer.from(value, 'base64'))
   };
   store = new JsonStore(path.join(app.getPath('userData'), 'data.json'), passwordCodec);
+  debugConfig = readDebugConfig();
   updateService = new UpdateService({ store, currentVersion: app.getVersion() });
+  updateService.cleanupDownloads();
   cacheManager = new CacheManager(path.join(app.getPath('temp'), 'svn-browser-clipboard'));
   cacheManager.cleanup();
   cacheCleanupTimer = setInterval(() => cacheManager.cleanup(), 60 * 60 * 1000);
