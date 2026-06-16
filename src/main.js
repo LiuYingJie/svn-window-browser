@@ -88,6 +88,11 @@ function registerHandlers() {
     if (!repository) throw new Error('仓库不存在或已被删除');
     return svn.search(repository, keyword);
   });
+  ipcMain.handle('svn:create-folder', async (_event, repositoryId, parentPath, folderName, message) => {
+    const repository = store.getRepository(repositoryId);
+    if (!repository) throw new Error('仓库不存在或已被删除');
+    return svn.createFolder(repository, parentPath, folderName, message);
+  });
 
   ipcMain.handle('svn:export', async (_event, repositoryId, relativePath) => {
     const repository = store.getRepository(repositoryId);

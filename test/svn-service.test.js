@@ -70,6 +70,61 @@ test('SvnService search returns recursive name matches with full paths', async (
   ]);
 });
 
+test('SvnService creates remote folder with a commit message', async () => {
+  const service = new SvnService(() => 'svn');
+  let invocation;
+  service.run = async (args, repository) => {
+    invocation = { args, repository };
+  };
+  const repository = { url: 'https://example.test/svn', username: 'alice' };
+
+  assert.deepEqual(
+    await service.createFolder(repository, '关卡/BS_51——BS_100', '猪咪', '创建猪咪目录'),
+    {
+      name: '猪咪',
+      path: '关卡/BS_51——BS_100/猪咪'
+    }
+  );
+  assert.deepEqual(invocation, {
+    args: [
+      'mkdir',
+      '-m',
+      '创建猪咪目录',
+      'https://example.test/svn/%E5%85%B3%E5%8D%A1/BS_51%E2%80%94%E2%80%94BS_100/%E7%8C%AA%E5%92%AA'
+    ],
+    repository
+  });
+});
+
+test('SvnService creates a default commit message for remote folders', async () => {
+  const service = new SvnService(() => 'svn');
+  let invocation;
+  service.run = async (args) => {
+    invocation = args;
+  };
+
+  await service.createFolder({ url: 'https://example.test/svn' }, '', 'docs', '');
+
+  assert.deepEqual(invocation, [
+    'mkdir',
+    '-m',
+    '新建文件夹 docs',
+    'https://example.test/svn/docs'
+  ]);
+});
+
+test('SvnService rejects invalid remote folder names', async () => {
+  const service = new SvnService(() => 'svn');
+  service.run = async () => {
+    throw new Error('should not run svn');
+  };
+
+  await assert.rejects(
+    () => service.createFolder({ url: 'https://example.test/svn' }, '', 'a/b', 'message'),
+    /不能包含路径分隔符/
+  );
+});
+
 test('SvnService checks out a directory to its full local relative path', async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'svn-browser-checkout-local-'));
   const destination = path.join(root, '关卡', 'BS_51——BS_100', '猪咪');

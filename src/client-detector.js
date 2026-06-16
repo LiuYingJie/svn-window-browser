@@ -6,9 +6,12 @@ function firstExisting(paths) {
   return paths.find((candidate) => candidate && fs.existsSync(candidate)) || '';
 }
 
-function findOnPath(executable) {
+function findOnPath(executable, environment = process.env) {
+  const pathValue = environment.PATH ?? environment.Path;
+  if (pathValue === '') return '';
   const result = spawnSync('where.exe', [executable], {
     encoding: 'utf8',
+    env: { ...process.env, ...environment },
     windowsHide: true
   });
   if (result.status !== 0) return '';
@@ -26,7 +29,7 @@ function detectSvnClient(configuredExecutable = '', environment = process.env, b
   const svnExecutable = firstExisting([
     configuredExecutable,
     ...bundledExecutables,
-    findOnPath('svn.exe'),
+    findOnPath('svn.exe', environment),
     ...tortoiseDirectories.map((directory) => path.join(directory, 'svn.exe')),
     path.join(programFiles, 'SlikSvn', 'bin', 'svn.exe'),
     path.join(programFilesX86, 'SlikSvn', 'bin', 'svn.exe'),
@@ -34,7 +37,7 @@ function detectSvnClient(configuredExecutable = '', environment = process.env, b
     path.join(programFilesX86, 'CollabNet', 'Subversion Client', 'svn.exe')
   ]);
   const tortoiseProc = firstExisting([
-    findOnPath('TortoiseProc.exe'),
+    findOnPath('TortoiseProc.exe', environment),
     ...tortoiseDirectories.map((directory) => path.join(directory, 'TortoiseProc.exe'))
   ]);
 

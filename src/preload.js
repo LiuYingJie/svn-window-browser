@@ -12,6 +12,8 @@ contextBridge.exposeInMainWorld('svnBrowser', {
   svn: {
     list: (repositoryId, relativePath) => ipcRenderer.invoke('svn:list', repositoryId, relativePath),
     search: (repositoryId, keyword) => ipcRenderer.invoke('svn:search', repositoryId, keyword),
+    createFolder: (repositoryId, parentPath, folderName, message) =>
+      ipcRenderer.invoke('svn:create-folder', repositoryId, parentPath, folderName, message),
     export: (repositoryId, relativePath) => ipcRenderer.invoke('svn:export', repositoryId, relativePath),
     applyToLocal: (repositoryId, relativePath, kind, taskId) =>
       ipcRenderer.invoke('svn:apply-to-local', repositoryId, relativePath, kind, taskId),

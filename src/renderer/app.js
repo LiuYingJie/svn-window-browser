@@ -34,6 +34,7 @@ const elements = {
   breadcrumbs: document.querySelector('#breadcrumbs'),
   back: document.querySelector('#back-button'),
   refresh: document.querySelector('#refresh-button'),
+  createFolder: document.querySelector('#create-folder-button'),
   copySelected: document.querySelector('#copy-selected-button'),
   exportCurrent: document.querySelector('#export-current-button'),
   selectionStatus: document.querySelector('#selection-status'),
@@ -60,6 +61,12 @@ const elements = {
   cacheFileCount: document.querySelector('#cache-file-count'),
   cacheBatchCount: document.querySelector('#cache-batch-count'),
   clearCache: document.querySelector('#clear-cache-button'),
+  createFolderDialog: document.querySelector('#create-folder-dialog'),
+  createFolderForm: document.querySelector('#create-folder-form'),
+  createFolderName: document.querySelector('#create-folder-name'),
+  createFolderMessage: document.querySelector('#create-folder-message'),
+  createFolderParent: document.querySelector('#create-folder-parent'),
+  createFolderSubmit: document.querySelector('#create-folder-submit'),
   clientStatus: document.querySelector('#client-status'),
   svnPath: document.querySelector('#svn-path'),
   detectSvn: document.querySelector('#detect-svn-button'),
@@ -67,6 +74,7 @@ const elements = {
   downloadSvn: document.querySelector('#download-svn-button'),
   contextMenu: document.querySelector('#resource-context-menu'),
   applyToLocal: document.querySelector('#apply-to-local-button'),
+  createFolderContext: document.querySelector('#create-folder-context-button'),
   backgroundTasks: document.querySelector('#background-tasks'),
   backgroundTaskCount: document.querySelector('#background-task-count'),
   backgroundTaskList: document.querySelector('#background-task-list'),
@@ -158,10 +166,15 @@ function hideContextMenu() {
   elements.contextMenu.classList.add('hidden');
 }
 
-function showContextMenu(event, entry) {
+function showContextMenu(event, entry, showCreateFolder = false) {
   event.preventDefault();
   state.contextEntry = entry;
-  elements.applyToLocal.textContent = `应用${entry.kind === 'dir' ? '文件夹' : '文件'}到本地目录`;
+  elements.applyToLocal.classList.toggle('hidden', !entry);
+  elements.createFolderContext.classList.toggle('hidden', !showCreateFolder);
+  elements.createFolderContext.disabled = state.loading || !state.activeRepositoryId || state.searchMode;
+  if (entry) {
+    elements.applyToLocal.textContent = `应用${entry.kind === 'dir' ? '文件夹' : '文件'}到本地目录`;
+  }
   elements.contextMenu.classList.remove('hidden');
   const rect = elements.contextMenu.getBoundingClientRect();
   const left = Math.min(event.clientX, window.innerWidth - rect.width - 8);
@@ -466,13 +479,14 @@ function renderEntries(entries) {
     row.dataset.path = entry.path;
     row.addEventListener('click', (event) => selectEntry(index, event));
     row.addEventListener('contextmenu', (event) => {
+      event.stopPropagation();
       if (!state.selectedNames.has(entry.path)) {
         state.selectedNames.clear();
         state.selectedNames.add(entry.path);
         state.selectionAnchor = index;
         syncSelectedRows();
       }
-      showContextMenu(event, entry);
+      showContextMenu(event, entry, false);
     });
     row.addEventListener('dblclick', () => {
       if (entry.kind === 'dir') loadDirectory(entry.path);
@@ -531,6 +545,7 @@ function setLoading(loading, message = '正在读取仓库...') {
   elements.loading.classList.toggle('hidden', !loading);
   elements.refresh.disabled = loading || !state.activeRepositoryId;
   elements.exportCurrent.disabled = loading || !state.activeRepositoryId;
+  elements.createFolder.disabled = loading || !state.activeRepositoryId || state.searchMode;
   elements.back.disabled = loading || !state.activeRepositoryId || (!state.currentPath && !state.searchMode);
   updateSelectionStatus();
 }
@@ -571,6 +586,7 @@ async function selectRepository(id) {
   elements.browserView.classList.remove('hidden');
   elements.refresh.disabled = false;
   elements.exportCurrent.disabled = false;
+  elements.createFolder.disabled = false;
   elements.back.disabled = true;
   renderRepositories();
   renderBreadcrumbs();
@@ -668,6 +684,7 @@ async function deleteRepository(repository) {
     elements.emptyState.classList.remove('hidden');
     elements.refresh.disabled = true;
     elements.exportCurrent.disabled = true;
+    elements.createFolder.disabled = true;
   }
   elements.repositoryDialog.close();
   renderRepositories();
@@ -739,6 +756,65 @@ async function exportPath(relativePath) {
     await window.svnBrowser.system.showItem(destination);
   } catch (error) {
     showToast(errorMessage(error), 'error');
+  }
+}
+
+function openCreateFolderDialog() {
+  hideContextMenu();
+  if (!state.activeRepositoryId || state.loading) {
+    showToast('请先选择仓库并等待当前操作完成', 'error');
+    return;
+  }
+  if (state.searchMode) {
+    showToast('请先退出搜索结果，再新建文件夹', 'error');
+    return;
+  }
+  elements.createFolderForm.reset();
+  const repository = activeRepository();
+  const parentLabel = [repository?.name, state.currentPath].filter(Boolean).join('/');
+  elements.createFolderParent.textContent = `将在“${parentLabel || repository?.name || '当前路径'}”下创建。`;
+  elements.createFolderDialog.showModal();
+  elements.createFolderName.focus();
+}
+
+async function createFolder(event) {
+  event.preventDefault();
+  if (!state.activeRepositoryId || state.loading || state.searchMode) return;
+
+  const trimmedName = elements.createFolderName.value.trim();
+  if (!trimmedName) {
+    showToast('文件夹名称不能为空', 'error');
+    elements.createFolderName.focus();
+    return;
+  }
+  if (/[\\/]/.test(trimmedName) || trimmedName === '.' || trimmedName === '..') {
+    showToast('文件夹名称不能包含路径分隔符，也不能是 . 或 ..', 'error');
+    elements.createFolderName.focus();
+    return;
+  }
+
+  const defaultMessage = `新建文件夹 ${trimmedName}`;
+  const message = elements.createFolderMessage.value.trim() || defaultMessage;
+  const parentPath = state.currentPath;
+
+  elements.createFolderSubmit.disabled = true;
+  elements.createFolderDialog.close();
+  setLoading(true, `正在新建文件夹“${trimmedName}”...`);
+  try {
+    const result = await window.svnBrowser.svn.createFolder(
+      state.activeRepositoryId,
+      parentPath,
+      trimmedName,
+      message
+    );
+    showToast(`已新建文件夹：${result.path}`);
+    setLoading(false);
+    await loadDirectory(parentPath);
+  } catch (error) {
+    showToast(errorMessage(error), 'error');
+  } finally {
+    elements.createFolderSubmit.disabled = false;
+    if (state.loading) setLoading(false);
   }
 }
 
@@ -905,6 +981,7 @@ elements.iconsView.addEventListener('click', () => setViewMode('icons'));
 elements.listView.addEventListener('click', () => setViewMode('list'));
 elements.refresh.addEventListener('click', () => loadDirectory(state.currentPath));
 elements.back.addEventListener('click', goBack);
+elements.createFolder.addEventListener('click', openCreateFolderDialog);
 elements.copySelected.addEventListener('click', copySelectionToClipboard);
 elements.exportCurrent.addEventListener('click', () => exportPath(state.currentPath));
 elements.settingsButton.addEventListener('click', openSettings);
@@ -924,6 +1001,8 @@ elements.detectSvn.addEventListener('click', async () => {
 });
 elements.downloadSvn.addEventListener('click', () => window.svnBrowser.settings.openDownload());
 elements.applyToLocal.addEventListener('click', applyEntryToLocal);
+elements.createFolderContext.addEventListener('click', openCreateFolderDialog);
+elements.createFolderForm.addEventListener('submit', createFolder);
 window.svnBrowser.svn.onApplyProgress((progress) => {
   const message = progressMessage(progress.message);
   if (message) updateBackgroundTask(progress.taskId, { message });
@@ -941,6 +1020,13 @@ elements.fileList.addEventListener('click', (event) => {
     state.selectionAnchor = null;
     renderEntries(state.entries);
   }
+});
+elements.fileList.addEventListener('contextmenu', (event) => {
+  if (event.target.closest('.file-row')) return;
+  state.selectedNames.clear();
+  state.selectionAnchor = null;
+  syncSelectedRows();
+  showContextMenu(event, null, true);
 });
 elements.fileList.addEventListener('pointerdown', startMarqueeSelection);
 document.addEventListener('pointerdown', (event) => {

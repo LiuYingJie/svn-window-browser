@@ -41,33 +41,34 @@
 
       <main class="main">
         <header class="toolbar">
+          <div class="toolbar-primary-row">
+            <h1 id="page-title">选择一个仓库</h1>
+            <div class="toolbar-actions">
+              <form id="search-form" class="search-box">
+                <input id="search-input" type="search" placeholder="搜索文件或文件夹" aria-label="搜索文件或文件夹">
+                <button id="clear-search-button" type="button" class="search-clear hidden" title="清除搜索">×</button>
+                <button type="submit" class="search-button" title="搜索">⌕</button>
+              </form>
+              <div class="view-switcher" aria-label="查看方式">
+                <button id="icons-view-button" class="view-button" title="图标视图" aria-label="图标视图">
+                  <span class="grid-symbol"><i></i><i></i><i></i><i></i></span>
+                </button>
+                <button id="list-view-button" class="view-button active" title="列表视图" aria-label="列表视图">
+                  <span class="list-symbol"><i></i><i></i><i></i></span>
+                </button>
+              </div>
+              <span id="selection-status" class="selection-status hidden"></span>
+              <button id="create-folder-button" class="button secondary" disabled>新建文件夹</button>
+              <button id="copy-selected-button" class="button primary" disabled>复制选中项</button>
+              <button id="refresh-button" class="button secondary" disabled>刷新</button>
+              <button id="export-current-button" class="button secondary" disabled>复制当前文件夹到...</button>
+            </div>
+          </div>
           <div class="navigation-area">
             <button id="back-button" class="back-button" title="返回上一级" disabled aria-label="返回上一级">
               <span>←</span>
             </button>
-            <div>
-              <h1 id="page-title">选择一个仓库</h1>
-              <div id="breadcrumbs" class="breadcrumbs"></div>
-            </div>
-          </div>
-          <div class="toolbar-actions">
-            <form id="search-form" class="search-box">
-              <input id="search-input" type="search" placeholder="搜索文件或文件夹" aria-label="搜索文件或文件夹">
-              <button id="clear-search-button" type="button" class="search-clear hidden" title="清除搜索">×</button>
-              <button type="submit" class="search-button" title="搜索">⌕</button>
-            </form>
-            <div class="view-switcher" aria-label="查看方式">
-              <button id="icons-view-button" class="view-button" title="图标视图" aria-label="图标视图">
-                <span class="grid-symbol"><i></i><i></i><i></i><i></i></span>
-              </button>
-              <button id="list-view-button" class="view-button active" title="列表视图" aria-label="列表视图">
-                <span class="list-symbol"><i></i><i></i><i></i></span>
-              </button>
-            </div>
-            <span id="selection-status" class="selection-status hidden"></span>
-            <button id="copy-selected-button" class="button primary" disabled>复制选中项</button>
-            <button id="refresh-button" class="button secondary" disabled>刷新</button>
-            <button id="export-current-button" class="button secondary" disabled>复制当前文件夹到...</button>
+            <div id="breadcrumbs" class="breadcrumbs"></div>
           </div>
         </header>
 
@@ -212,7 +213,33 @@
       </div>
     </dialog>
 
+    <dialog id="create-folder-dialog">
+      <form id="create-folder-form" method="dialog">
+        <div class="dialog-heading">
+          <div>
+            <h2>新建文件夹</h2>
+            <p id="create-folder-parent">将在当前路径下创建。</p>
+          </div>
+          <button type="button" class="dialog-close" data-close-dialog>×</button>
+        </div>
+        <label>
+          文件夹名称
+          <input id="create-folder-name" required maxlength="120" placeholder="例如：新资源">
+        </label>
+        <label>
+          提交日志
+          <input id="create-folder-message" placeholder="不填写则自动生成">
+          <span class="field-hint">新建远程文件夹需要一次 SVN 提交日志。</span>
+        </label>
+        <div class="dialog-actions dialog-actions-end">
+          <button type="button" class="button secondary" data-close-dialog>取消</button>
+          <button id="create-folder-submit" type="submit" class="button primary">创建</button>
+        </div>
+      </form>
+    </dialog>
+
     <div id="resource-context-menu" class="context-menu hidden" role="menu">
+      <button id="create-folder-context-button" type="button" role="menuitem">新建文件夹</button>
       <button id="apply-to-local-button" type="button" role="menuitem">应用到本地目录</button>
     </div>
 

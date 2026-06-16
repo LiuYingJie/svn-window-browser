@@ -48,6 +48,14 @@ function parseSvnList(xml) {
   });
 }
 
+function normalizeDirectoryName(name) {
+  const normalized = String(name || '').trim();
+  if (!normalized) throw new Error('文件夹名称不能为空');
+  if (/[\\/]/.test(normalized)) throw new Error('文件夹名称不能包含路径分隔符');
+  if (normalized === '.' || normalized === '..') throw new Error('文件夹名称不能是 . 或 ..');
+  return normalized;
+}
+
 class SvnService {
   constructor(getExecutable) {
     this.getExecutable = getExecutable;
@@ -119,6 +127,14 @@ class SvnService {
       .slice(0, 500);
   }
 
+  async createFolder(repository, parentPath, folderName, message) {
+    const normalizedName = normalizeDirectoryName(folderName);
+    const relativePath = [parentPath, normalizedName].filter(Boolean).join('/');
+    const commitMessage = String(message || '').trim() || `新建文件夹 ${normalizedName}`;
+    await this.run(['mkdir', '-m', commitMessage, this.buildUrl(repository, relativePath)], repository);
+    return { name: normalizedName, path: relativePath };
+  }
+
   async export(repository, relativePath, destinationDirectory) {
     const sourceUrl = this.buildUrl(repository, relativePath);
     const itemName = relativePath.split('/').filter(Boolean).at(-1) || repository.name;
@@ -181,4 +197,4 @@ class SvnService {
   }
 }
 
-module.exports = { SvnService, parseSvnList };
+module.exports = { SvnService, parseSvnList, normalizeDirectoryName };
