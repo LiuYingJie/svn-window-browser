@@ -112,7 +112,9 @@ class SvnService {
   }
 
   buildCheckoutUrl(repository, relativePath, kind) {
-    return this.buildUrl(repository, svnDirectoryPath(relativePath, kind));
+    const checkoutPath = svnDirectoryPath(relativePath, kind);
+    const repositoryUrl = String(repository.url || '').replace(/\/+$/g, '');
+    return checkoutPath ? `${repositoryUrl}/${checkoutPath}` : repositoryUrl;
   }
 
   async list(repository, relativePath = '') {

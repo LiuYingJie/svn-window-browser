@@ -1,6 +1,6 @@
 {
   "name": "svn-browser",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "description": "A lightweight Electron browser for multiple SVN repositories.",
   "main": "src/main.js",
   "scripts": {

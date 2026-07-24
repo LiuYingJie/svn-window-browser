@@ -143,12 +143,21 @@ test('SvnService builds checkout URL for a file parent directory', () => {
   );
 });
 
-test('SvnService encodes checkout URL path segments', () => {
+test('SvnService builds readable checkout URL for Chinese path segments', () => {
   const service = new SvnService(() => 'svn');
 
   assert.equal(
     service.buildCheckoutUrl({ url: 'https://example.test/svn' }, '关卡/BS_51——BS_100/猪咪', 'dir'),
-    'https://example.test/svn/%E5%85%B3%E5%8D%A1/BS_51%E2%80%94%E2%80%94BS_100/%E7%8C%AA%E5%92%AA'
+    'https://example.test/svn/关卡/BS_51——BS_100/猪咪'
+  );
+});
+
+test('SvnService avoids double slash in readable checkout URL', () => {
+  const service = new SvnService(() => 'svn');
+
+  assert.equal(
+    service.buildCheckoutUrl({ url: 'https://example.test/svn/' }, '关卡/猪咪', 'dir'),
+    'https://example.test/svn/关卡/猪咪'
   );
 });
 
