@@ -37,6 +37,7 @@ function createWindow() {
     minHeight: 600,
     backgroundColor: '#f5f7fb',
     title: 'SVN Browser',
+    icon: path.join(__dirname, '..', 'build', 'icon.ico'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
