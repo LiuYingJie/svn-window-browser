@@ -1,6 +1,7 @@
 const { spawn } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
+const { svnDirectoryPath } = require('./svn-path');
 
 function escapeXml(value) {
   return value
@@ -108,6 +109,10 @@ class SvnService {
       .map(encodeURIComponent)
       .join('/');
     return encodedPath ? `${repository.url}/${encodedPath}` : repository.url;
+  }
+
+  buildCheckoutUrl(repository, relativePath, kind) {
+    return this.buildUrl(repository, svnDirectoryPath(relativePath, kind));
   }
 
   async list(repository, relativePath = '') {

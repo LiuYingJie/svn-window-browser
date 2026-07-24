@@ -82,6 +82,7 @@ const elements = {
   appVersion: document.querySelector('#app-version'),
   contextMenu: document.querySelector('#resource-context-menu'),
   applyToLocal: document.querySelector('#apply-to-local-button'),
+  copySvnPath: document.querySelector('#copy-svn-path-button'),
   createFolderContext: document.querySelector('#create-folder-context-button'),
   backgroundTasks: document.querySelector('#background-tasks'),
   backgroundTaskCount: document.querySelector('#background-task-count'),
@@ -193,8 +194,10 @@ function showContextMenu(event, entry, showCreateFolder = false) {
   event.preventDefault();
   state.contextEntry = entry;
   elements.applyToLocal.classList.toggle('hidden', !entry);
+  elements.copySvnPath.classList.toggle('hidden', !entry);
   elements.createFolderContext.classList.toggle('hidden', !showCreateFolder);
   elements.createFolderContext.disabled = state.loading || !state.activeRepositoryId || state.searchMode;
+  elements.copySvnPath.disabled = !entry || !state.activeRepositoryId;
   if (entry) {
     elements.applyToLocal.textContent = `应用${entry.kind === 'dir' ? '文件夹' : '文件'}到本地目录`;
   }
@@ -782,6 +785,19 @@ async function exportPath(relativePath) {
   }
 }
 
+async function copySvnPathToClipboard() {
+  const entry = state.contextEntry;
+  const repositoryId = state.activeRepositoryId;
+  hideContextMenu();
+  if (!entry || !repositoryId) return;
+  try {
+    const result = await window.svnBrowser.svn.copyPathToClipboard(repositoryId, entry.path, entry.kind);
+    showToast(`已复制SVN路径：${result.path}`);
+  } catch (error) {
+    showToast(errorMessage(error), 'error');
+  }
+}
+
 function openCreateFolderDialog() {
   hideContextMenu();
   if (!state.activeRepositoryId || state.loading) {
@@ -1124,6 +1140,7 @@ elements.checkUpdatesInput.addEventListener('change', async () => {
 });
 elements.installUpdate.addEventListener('click', installUpdate);
 elements.dismissUpdate.addEventListener('click', hideUpdateNotice);
+elements.copySvnPath.addEventListener('click', copySvnPathToClipboard);
 elements.applyToLocal.addEventListener('click', applyEntryToLocal);
 elements.createFolderContext.addEventListener('click', openCreateFolderDialog);
 elements.createFolderForm.addEventListener('submit', createFolder);

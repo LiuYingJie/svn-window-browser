@@ -1,6 +1,6 @@
 const path = require('node:path');
 const fs = require('node:fs');
-const { app, BrowserWindow, dialog, ipcMain, safeStorage, shell } = require('electron');
+const { app, BrowserWindow, clipboard, dialog, ipcMain, safeStorage, shell } = require('electron');
 const { JsonStore } = require('./store');
 const { SvnService } = require('./svn-service');
 const { detectSvnClient } = require('./client-detector');
@@ -141,6 +141,14 @@ function registerHandlers() {
     } finally {
       cacheManager.releaseDirectory(clipboardRoot);
     }
+  });
+
+  ipcMain.handle('svn:copy-path-to-clipboard', async (_event, repositoryId, relativePath, kind) => {
+    const repository = store.getRepository(repositoryId);
+    if (!repository) throw new Error('仓库不存在或已被删除');
+    const copiedPath = svn.buildCheckoutUrl(repository, relativePath, kind);
+    clipboard.writeText(copiedPath);
+    return { path: copiedPath };
   });
 
   ipcMain.handle('cache:get-stats', () => cacheManager.getStats());

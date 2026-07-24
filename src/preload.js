@@ -23,7 +23,9 @@ contextBridge.exposeInMainWorld('svnBrowser', {
       return () => ipcRenderer.removeListener('svn:apply-progress', listener);
     },
     copyToClipboard: (repositoryId, relativePaths) =>
-      ipcRenderer.invoke('svn:copy-to-clipboard', repositoryId, relativePaths)
+      ipcRenderer.invoke('svn:copy-to-clipboard', repositoryId, relativePaths),
+    copyPathToClipboard: (repositoryId, relativePath, kind) =>
+      ipcRenderer.invoke('svn:copy-path-to-clipboard', repositoryId, relativePath, kind)
   },
   cache: {
     getStats: () => ipcRenderer.invoke('cache:get-stats'),

@@ -125,6 +125,33 @@ test('SvnService rejects invalid remote folder names', async () => {
   );
 });
 
+test('SvnService builds checkout URL for a directory', () => {
+  const service = new SvnService(() => 'svn');
+
+  assert.equal(
+    service.buildCheckoutUrl({ url: 'https://example.test/svn' }, 'a/b/c', 'dir'),
+    'https://example.test/svn/a/b/c'
+  );
+});
+
+test('SvnService builds checkout URL for a file parent directory', () => {
+  const service = new SvnService(() => 'svn');
+
+  assert.equal(
+    service.buildCheckoutUrl({ url: 'https://example.test/svn' }, 'd/e/f.txt', 'file'),
+    'https://example.test/svn/d/e'
+  );
+});
+
+test('SvnService encodes checkout URL path segments', () => {
+  const service = new SvnService(() => 'svn');
+
+  assert.equal(
+    service.buildCheckoutUrl({ url: 'https://example.test/svn' }, '关卡/BS_51——BS_100/猪咪', 'dir'),
+    'https://example.test/svn/%E5%85%B3%E5%8D%A1/BS_51%E2%80%94%E2%80%94BS_100/%E7%8C%AA%E5%92%AA'
+  );
+});
+
 test('SvnService checks out a directory to its full local relative path', async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'svn-browser-checkout-local-'));
   const destination = path.join(root, '关卡', 'BS_51——BS_100', '猪咪');
