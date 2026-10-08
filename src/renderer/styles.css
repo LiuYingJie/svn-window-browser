@@ -21,6 +21,7 @@ button { cursor: pointer; }
 .sidebar {
   display: flex;
   flex-direction: column;
+  min-height: 0;
   padding: 24px 16px 16px;
   color: #fff;
   background: var(--sidebar);

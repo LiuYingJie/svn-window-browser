@@ -2,7 +2,6 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { app, shell } = require('electron');
 
-const DAY_MS = 24 * 60 * 60 * 1000;
 const UPDATE_DOWNLOAD_DIR = 'svn-browser-updates';
 
 function normalizeConfig(raw) {
@@ -40,13 +39,6 @@ function compareVersions(left, right) {
   return 0;
 }
 
-function shouldCheckToday(lastUpdateCheckAt, now = new Date()) {
-  if (!lastUpdateCheckAt) return true;
-  const last = new Date(lastUpdateCheckAt);
-  if (Number.isNaN(last.getTime())) return true;
-  return now.getTime() - last.getTime() >= DAY_MS;
-}
-
 class UpdateService {
   constructor({ store, currentVersion }) {
     this.store = store;
@@ -67,13 +59,6 @@ class UpdateService {
     const settings = this.store.getSettings();
     if (!this.config.enabled || (!force && settings.checkUpdates === false)) {
       return { supported: this.config.enabled, updateAvailable: false, skipped: true };
-    }
-    if (!force && !shouldCheckToday(settings.lastUpdateCheckAt)) {
-      return { supported: true, updateAvailable: false, skipped: true };
-    }
-
-    if (!force) {
-      this.store.saveSettings({ lastUpdateCheckAt: new Date().toISOString() });
     }
     const response = await fetch(this.config.manifestUrl, { cache: 'no-store' });
     if (!response.ok) {
@@ -173,10 +158,8 @@ class UpdateService {
 }
 
 module.exports = {
-  DAY_MS,
   UPDATE_DOWNLOAD_DIR,
   UpdateService,
   compareVersions,
-  readUpdateConfig,
-  shouldCheckToday
+  readUpdateConfig
 };

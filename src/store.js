@@ -12,8 +12,7 @@ class JsonStore {
       settings: {
         svnExecutable: '',
         viewMode: 'list',
-        checkUpdates: true,
-        lastUpdateCheckAt: ''
+        checkUpdates: true
       }
     };
     this.load();
@@ -27,8 +26,7 @@ class JsonStore {
         settings: {
           svnExecutable: parsed.settings?.svnExecutable || '',
           viewMode: parsed.settings?.viewMode === 'icons' ? 'icons' : 'list',
-          checkUpdates: parsed.settings?.checkUpdates !== false,
-          lastUpdateCheckAt: parsed.settings?.lastUpdateCheckAt || ''
+          checkUpdates: parsed.settings?.checkUpdates !== false
         }
       };
     } catch (error) {

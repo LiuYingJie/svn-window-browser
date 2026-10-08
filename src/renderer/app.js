@@ -1088,6 +1088,7 @@ function renderClientStatus(client) {
 }
 
 async function initialize() {
+  checkForUpdates();
   const [repositories, settings, savedAccounts] = await Promise.all([
     window.svnBrowser.repositories.list(),
     window.svnBrowser.settings.get(),
@@ -1097,7 +1098,6 @@ async function initialize() {
   state.savedAccounts = savedAccounts;
   applyViewMode(settings.viewMode);
   renderRepositories();
-  checkForUpdates();
   if (state.repositories.length > 0) {
     await selectRepository(state.repositories[0].id);
   }
