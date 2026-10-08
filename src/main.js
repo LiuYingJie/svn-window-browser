@@ -115,7 +115,10 @@ function registerHandlers() {
     if (!repository) throw new Error('仓库不存在或已被删除');
     if (!['file', 'dir'].includes(kind)) throw new Error('不支持的资源类型');
     if (typeof taskId !== 'string' || !taskId) throw new Error('无效的后台任务');
-    const { destination } = resolveLocalResource(repository.localDirectory, relativePath);
+    if (!relativePath && kind !== 'dir') throw new Error('无效的仓库相对路径');
+    const destination = relativePath
+      ? resolveLocalResource(repository.localDirectory, relativePath).destination
+      : validateLocalDirectory(repository.localDirectory);
     const sendProgress = (progress) => {
       if (!event.sender.isDestroyed()) {
         event.sender.send('svn:apply-progress', { taskId, ...progress });

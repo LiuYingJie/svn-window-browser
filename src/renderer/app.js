@@ -37,7 +37,7 @@ const elements = {
   refresh: document.querySelector('#refresh-button'),
   createFolder: document.querySelector('#create-folder-button'),
   copySelected: document.querySelector('#copy-selected-button'),
-  exportCurrent: document.querySelector('#export-current-button'),
+  applyRoot: document.querySelector('#apply-root-button'),
   selectionStatus: document.querySelector('#selection-status'),
   itemCount: document.querySelector('#item-count'),
   searchForm: document.querySelector('#search-form'),
@@ -570,7 +570,7 @@ function setLoading(loading, message = '正在读取仓库...') {
   elements.loadingMessage.textContent = message;
   elements.loading.classList.toggle('hidden', !loading);
   elements.refresh.disabled = loading || !state.activeRepositoryId;
-  elements.exportCurrent.disabled = loading || !state.activeRepositoryId;
+  elements.applyRoot.disabled = loading || !state.activeRepositoryId;
   elements.createFolder.disabled = loading || !state.activeRepositoryId || state.searchMode;
   elements.back.disabled = loading || !state.activeRepositoryId || (!state.currentPath && !state.searchMode);
   updateSelectionStatus();
@@ -611,7 +611,7 @@ async function selectRepository(id) {
   elements.emptyState.classList.add('hidden');
   elements.browserView.classList.remove('hidden');
   elements.refresh.disabled = false;
-  elements.exportCurrent.disabled = false;
+  elements.applyRoot.disabled = false;
   elements.createFolder.disabled = false;
   elements.back.disabled = true;
   renderRepositories();
@@ -709,7 +709,7 @@ async function deleteRepository(repository) {
     elements.browserView.classList.add('hidden');
     elements.emptyState.classList.remove('hidden');
     elements.refresh.disabled = true;
-    elements.exportCurrent.disabled = true;
+    elements.applyRoot.disabled = true;
     elements.createFolder.disabled = true;
   }
   elements.repositoryDialog.close();
@@ -719,8 +719,18 @@ async function deleteRepository(repository) {
 
 async function applyEntryToLocal() {
   const entry = state.contextEntry;
-  const repositoryId = state.activeRepositoryId;
   hideContextMenu();
+  await applyToLocal(entry);
+}
+
+async function applyRootToLocal() {
+  const repository = activeRepository();
+  if (!repository) return;
+  await applyToLocal({ path: '', kind: 'dir', name: repository.name });
+}
+
+async function applyToLocal(entry) {
+  const repositoryId = state.activeRepositoryId;
   if (!entry || !repositoryId) return;
   const taskScope = entry.kind === 'file'
     ? entry.path.split('/').slice(0, -1).join('/')
@@ -730,6 +740,8 @@ async function applyEntryToLocal() {
     && task.repositoryId === repositoryId
     && (
       task.scope === taskScope
+      || !task.scope
+      || !taskScope
       || task.scope.startsWith(`${taskScope}/`)
       || taskScope.startsWith(`${task.scope}/`)
     )
@@ -1111,7 +1123,7 @@ elements.refresh.addEventListener('click', () => loadDirectory(state.currentPath
 elements.back.addEventListener('click', goBack);
 elements.createFolder.addEventListener('click', openCreateFolderDialog);
 elements.copySelected.addEventListener('click', copySelectionToClipboard);
-elements.exportCurrent.addEventListener('click', () => exportPath(state.currentPath));
+elements.applyRoot.addEventListener('click', applyRootToLocal);
 elements.settingsButton.addEventListener('click', openSettings);
 elements.clearCache.addEventListener('click', clearCache);
 elements.settingsTabs.forEach((tab) => {
