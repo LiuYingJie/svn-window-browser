@@ -7,6 +7,8 @@ const state = {
   searchQuery: '',
   searchMode: false,
   viewMode: 'list',
+  sortKey: 'name',
+  sortDirection: 'asc',
   entries: [],
   selectedNames: new Set(),
   selectionAnchor: null,
@@ -324,6 +326,53 @@ function renderBreadcrumbs() {
   });
 }
 
+function compareEntries(left, right) {
+  if (left.kind !== right.kind) return left.kind === 'dir' ? -1 : 1;
+  const direction = state.sortDirection === 'desc' ? -1 : 1;
+  let result = 0;
+  if (state.sortKey === 'revision') {
+    result = (Number(left.revision) || 0) - (Number(right.revision) || 0);
+  } else if (state.sortKey === 'author') {
+    result = (left.author || '').localeCompare(right.author || '', 'zh-CN');
+  } else if (state.sortKey === 'date') {
+    result = (Date.parse(left.date) || 0) - (Date.parse(right.date) || 0);
+  } else {
+    result = left.name.localeCompare(right.name, 'zh-CN', { numeric: true });
+  }
+  if (result === 0) result = left.name.localeCompare(right.name, 'zh-CN', { numeric: true });
+  return result * direction;
+}
+
+function applyEntrySort() {
+  const anchorPath = state.selectionAnchor == null ? null : state.entries[state.selectionAnchor]?.path;
+  state.entries.sort(compareEntries);
+  if (!anchorPath) return;
+  const index = state.entries.findIndex((entry) => entry.path === anchorPath);
+  state.selectionAnchor = index >= 0 ? index : null;
+}
+
+function updateSortHeaders() {
+  document.querySelectorAll('.sort-button').forEach((button) => {
+    const active = button.dataset.sort === state.sortKey;
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-sort', active
+      ? (state.sortDirection === 'desc' ? 'descending' : 'ascending')
+      : 'none');
+  });
+}
+
+function setSort(key) {
+  if (state.sortKey === key) {
+    state.sortDirection = state.sortDirection === 'asc' ? 'desc' : 'asc';
+  } else {
+    state.sortKey = key;
+    state.sortDirection = 'asc';
+  }
+  updateSortHeaders();
+  applyEntrySort();
+  renderEntries(state.entries);
+}
+
 function formatDate(value) {
   if (!value) return '—';
   return new Intl.DateTimeFormat('zh-CN', {
@@ -589,9 +638,10 @@ async function loadDirectory(relativePath) {
     state.entries = entries;
     state.selectedNames.clear();
     state.selectionAnchor = null;
+    applyEntrySort();
     elements.back.disabled = !relativePath;
     renderBreadcrumbs();
-    renderEntries(entries);
+    renderEntries(state.entries);
   } catch (error) {
     showToast(errorMessage(error), 'error');
     elements.fileList.innerHTML = '<div class="list-message">无法读取此目录，请检查仓库地址、账号和 SVN 客户端设置。</div>';
@@ -887,10 +937,11 @@ async function searchRepository(event) {
     state.entries = entries;
     state.selectedNames.clear();
     state.selectionAnchor = null;
+    applyEntrySort();
     elements.clearSearch.classList.remove('hidden');
     elements.back.disabled = false;
     renderBreadcrumbs();
-    renderEntries(entries);
+    renderEntries(state.entries);
     if (entries.length === 0) showToast(`没有找到包含“${keyword}”的文件或文件夹`);
   } catch (error) {
     showToast(errorMessage(error), 'error');
@@ -1168,6 +1219,10 @@ window.svnBrowser.svn.onApplyProgress((progress) => {
 document.querySelectorAll('[data-close-dialog]').forEach((button) => {
   button.addEventListener('click', () => button.closest('dialog').close());
 });
+document.querySelectorAll('.sort-button').forEach((button) => {
+  button.addEventListener('click', () => setSort(button.dataset.sort));
+});
+updateSortHeaders();
 elements.fileList.addEventListener('click', (event) => {
   if (suppressFileListClick) {
     suppressFileListClick = false;
